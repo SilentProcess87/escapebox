@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MITRE ATT&CK Matrix - Live Detection Dashboard</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Orbitron', monospace;
+            background: #000;
+            color: #0f0;
+            overflow-x: auto;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #1a0000 0%, #001a00 50%, #00001a 100%);
+            padding: 20px;
+            text-align: center;
+            border-bottom: 3px solid #0f0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .title {
+            font-size: 48px;
+            font-weight: 900;
+            text-shadow: 0 0 20px #0f0, 0 0 40px #0f0;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+        
+        .stats {
+            display: flex;
+            justify-content: center;
+            gap: 50px;
+            margin: 20px 0;
+            font-size: 20px;
+        }
+        
+        .stat {
+            padding: 10px 20px;
+            border: 2px solid #0f0;
+            background: rgba(0, 255, 0, 0.1);
+            border-radius: 5px;
+            animation: statGlow 2s infinite alternate;
+        }
+        
+        @keyframes statGlow {
+            from { box-shadow: 0 0 10px #0f0; }
+            to { box-shadow: 0 0 20px #0f0, 0 0 30px #0f0; }
+        }
+        
+        .matrix-container {
+            padding: 20px;
+            overflow-x: auto;
+        }
+        
+        .matrix {
+            display: table;
+            border-collapse: collapse;
+            margin: 0 auto;
+            background: rgba(0, 0, 0, 0.9);
+            border: 2px solid #0f0;
+        }
+        
+        .tactic-header {
+            background: #001a00;
+            color: #0f0;
+            padding: 15px;
+            text-align: center;
+            font-weight: bold;
+            border: 1px solid #0f0;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            position: sticky;
+            top: 100px;
+        }
+        
+        .technique {
+            padding: 10px;
+            border: 1px solid #333;
+            cursor: pointer;
+            transition: all 0.3s;
+            min-width: 150px;
+            max-width: 200px;
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            font-size: 12px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .technique:hover {
+            background: rgba(0, 255, 0, 0.2);
+            border-color: #0f0;
+            transform: scale(1.05);
+            z-index: 10;
+        }
+        
+        /* Technique states */
+        .technique.inactive {
+            background: #111;
+            color: #666;
+        }
+        
+        .technique.attempted {
+            background: rgba(255, 255, 0, 0.2);
+            color: #ff0;
+            border-color: #ff0;
+            animation: attemptPulse 1s infinite;
+        }
+        
+        @keyframes attemptPulse {
+            0%, 100% { box-shadow: inset 0 0 10px #ff0; }
+            50% { box-shadow: inset 0 0 20px #ff0, 0 0 10px #ff0; }
+        }
+        
+        .technique.executing {
+            background: rgba(255, 165, 0, 0.3);
+            color: #ffa500;
+            border-color: #ffa500;
+            animation: executingPulse 0.5s infinite;
+        }
+        
+        @keyframes executingPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        
+        .technique.success {
+            background: rgba(255, 0, 0, 0.3);
+            color: #f00;
+            border-color: #f00;
+            animation: successGlow 2s infinite;
+        }
+        
+        @keyframes successGlow {
+            0%, 100% { 
+                box-shadow: inset 0 0 20px #f00, 0 0 20px #f00;
+                text-shadow: 0 0 10px #f00;
+            }
+            50% { 
+                box-shadow: inset 0 0 30px #f00, 0 0 40px #f00;
+                text-shadow: 0 0 20px #f00;
+            }
+        }
+        
+        .technique.detected {
+            background: rgba(0, 255, 0, 0.3);
+            color: #0f0;
+            border-color: #0f0;
+            animation: detectedFlash 1s infinite;
+        }
+        
+        @keyframes detectedFlash {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        /* Animated background effect */
+        .technique::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+            transform: rotate(45deg);
+            transition: all 0.5s;
+            opacity: 0;
+        }
+        
+        .technique.success::before {
+            animation: sweep 2s infinite;
+        }
+        
+        @keyframes sweep {
+            0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); opacity: 0; }
+            50% { opacity: 1; }
+            100% { transform: translateX(100%) translateY(100%) rotate(45deg); opacity: 0; }
+        }
+        
+        .technique-id {
+            position: absolute;
+            top: 2px;
+            right: 5px;
+            font-size: 10px;
+            color: #888;
+        }
+        
+        .technique-count {
+            position: absolute;
+            bottom: 2px;
+            right: 5px;
+            font-size: 10px;
+            color: #ff0;
+            font-weight: bold;
+        }
+        
+        .legend {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            border: 2px solid #0f0;
+            padding: 20px;
+            border-radius: 5px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+        }
+        
+        .legend-box {
+            width: 30px;
+            height: 30px;
+            margin-right: 10px;
+            border: 1px solid #666;
+        }
+        
+        .timeline {
+            position: fixed;
+            left: 20px;
+            top: 200px;
+            bottom: 20px;
+            width: 300px;
+            background: rgba(0, 0, 0, 0.9);
+            border: 2px solid #0f0;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        
+        .timeline-item {
+            margin: 10px 0;
+            padding: 10px;
+            background: rgba(0, 255, 0, 0.1);
+            border-left: 3px solid #0f0;
+            font-size: 12px;
+            animation: slideIn 0.5s;
+        }
+        
+        @keyframes slideIn {
+            from { transform: translateX(-20px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        .time {
+            color: #888;
+            font-size: 10px;
+        }
+        
+        /* Special effects for high-value techniques */
+        .technique.high-value {
+            position: relative;
+        }
+        
+        .technique.high-value.success::after {
+            content: '⚠️';
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            font-size: 20px;
+            animation: bounce 1s infinite;
+        }
+        
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        
+        /* Matrix rain effect in background */
+        .matrix-rain {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            opacity: 0.1;
+            z-index: -1;
+        }
+    </style>
+</head>
+<body>
+    <canvas class="matrix-rain" id="matrixRain"></canvas>
+    
+    <div class="header">
+        <div class="title">MITRE ATT&CK LIVE DETECTION MATRIX</div>
+        <div class="stats">
+            <div class="stat">
+                <span>Techniques Attempted:</span>
+                <span id="attemptedCount">0</span>
+            </div>
+            <div class="stat">
+                <span>Techniques Executed:</span>
+                <span id="executedCount">0</span>
+            </div>
+            <div class="stat">
+                <span>Detections:</span>
+                <span id="detectedCount">0</span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="timeline">
+        <h3 style="text-align: center; margin-bottom: 20px; color: #0f0;">ACTIVITY TIMELINE</h3>
+        <div id="timelineContent"></div>
+    </div>
+    
+    <div class="matrix-container">
+        <table class="matrix" id="attackMatrix">
+            <!-- Matrix will be populated by JavaScript -->
+        </table>
+    </div>
+    
+    <div class="legend">
+        <h4 style="margin-bottom: 10px;">LEGEND</h4>
+        <div class="legend-item">
+            <div class="legend-box" style="background: #111;"></div>
+            <span>Not Attempted</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-box" style="background: rgba(255, 255, 0, 0.3);"></div>
+            <span>Attempted</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-box" style="background: rgba(255, 165, 0, 0.3);"></div>
+            <span>Executing</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-box" style="background: rgba(255, 0, 0, 0.3);"></div>
+            <span>Successfully Executed</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-box" style="background: rgba(0, 255, 0, 0.3);"></div>
+            <span>Detected by XDR</span>
+        </div>
+    </div>
+    
+    <script>
+        // MITRE ATT&CK Matrix Data
+        const attackMatrix = {
+            "Initial Access": [
+                { id: "T1566.001", name: "Spearphishing Attachment", highValue: true },
+                { id: "T1078", name: "Valid Accounts" },
+                { id: "T1190", name: "Exploit Public-Facing Application" },
+                { id: "T1133", name: "External Remote Services" }
+            ],
+            "Execution": [
+                { id: "T1059.001", name: "PowerShell", highValue: true },
+                { id: "T1059.003", name: "Windows Command Shell" },
+                { id: "T1106", name: "Native API" },
+                { id: "T1053.005", name: "Scheduled Task" },
+                { id: "T1569.002", name: "Service Execution" }
+            ],
+            "Persistence": [
+                { id: "T1547.001", name: "Registry Run Keys", highValue: true },
+                { id: "T1543.003", name: "Windows Service" },
+                { id: "T1546.003", name: "WMI Event Subscription" },
+                { id: "T1098", name: "Account Manipulation" },
+                { id: "T1136", name: "Create Account" }
+            ],
+            "Privilege Escalation": [
+                { id: "T1055", name: "Process Injection", highValue: true },
+                { id: "T1134", name: "Access Token Manipulation" },
+                { id: "T1068", name: "Exploitation for Privilege Escalation" },
+                { id: "T1574.001", name: "DLL Search Order Hijacking" }
+            ],
+            "Defense Evasion": [
+                { id: "T1070", name: "Indicator Removal", highValue: true },
+                { id: "T1036", name: "Masquerading", highValue: true },
+                { id: "T1140", name: "Deobfuscate/Decode Files" },
+                { id: "T1497", name: "Virtualization/Sandbox Evasion" },
+                { id: "T1562.001", name: "Disable or Modify Tools" },
+                { id: "T1112", name: "Modify Registry" }
+            ],
+            "Credential Access": [
+                { id: "T1003", name: "OS Credential Dumping", highValue: true },
+                { id: "T1555", name: "Credentials from Password Stores" },
+                { id: "T1552", name: "Unsecured Credentials" },
+                { id: "T1110", name: "Brute Force" },
+                { id: "T1056", name: "Input Capture" }
+            ],
+            "Discovery": [
+                { id: "T1082", name: "System Information Discovery" },
+                { id: "T1083", name: "File and Directory Discovery", highValue: true },
+                { id: "T1057", name: "Process Discovery" },
+                { id: "T1012", name: "Query Registry" },
+                { id: "T1018", name: "Remote System Discovery" },
+                { id: "T1016", name: "System Network Configuration Discovery" }
+            ],
+            "Lateral Movement": [
+                { id: "T1021", name: "Remote Services", highValue: true },
+                { id: "T1570", name: "Lateral Tool Transfer" },
+                { id: "T1080", name: "Taint Shared Content" }
+            ],
+            "Collection": [
+                { id: "T1005", name: "Data from Local System" },
+                { id: "T1025", name: "Data from Removable Media" },
+                { id: "T1074", name: "Data Staged" },
+                { id: "T1113", name: "Screen Capture" },
+                { id: "T1115", name: "Clipboard Data" },
+                { id: "T1560", name: "Archive Collected Data" }
+            ],
+            "Command and Control": [
+                { id: "T1071", name: "Application Layer Protocol" },
+                { id: "T1132", name: "Data Encoding" },
+                { id: "T1573", name: "Encrypted Channel" },
+                { id: "T1105", name: "Ingress Tool Transfer" },
+                { id: "T1104", name: "Multi-Stage Channels" }
+            ],
+            "Exfiltration": [
+                { id: "T1048", name: "Exfiltration Over Alternative Protocol" },
+                { id: "T1567", name: "Exfiltration Over Web Service", highValue: true },
+                { id: "T1029", name: "Scheduled Transfer" },
+                { id: "T1041", name: "Exfiltration Over C2 Channel" }
+            ],
+            "Impact": [
+                { id: "T1486", name: "Data Encrypted for Impact", highValue: true },
+                { id: "T1490", name: "Inhibit System Recovery" },
+                { id: "T1489", name: "Service Stop" },
+                { id: "T1529", name: "System Shutdown/Reboot" }
+            ]
+        };
+        
+        // Technique states
+        const techniqueStates = {};
+        const timeline = [];
+        
+        // Build the matrix
+        function buildMatrix() {
+            const matrix = document.getElementById('attackMatrix');
+            
+            // Create header row
+            const headerRow = document.createElement('tr');
+            for (const tactic in attackMatrix) {
+                const th = document.createElement('th');
+                th.className = 'tactic-header';
+                th.textContent = tactic;
+                headerRow.appendChild(th);
+            }
+            matrix.appendChild(headerRow);
+            
+            // Find max techniques in any tactic
+            const maxTechniques = Math.max(...Object.values(attackMatrix).map(t => t.length));
+            
+            // Create technique rows
+            for (let i = 0; i < maxTechniques; i++) {
+                const row = document.createElement('tr');
+                
+                for (const tactic in attackMatrix) {
+                    const td = document.createElement('td');
+                    const techniques = attackMatrix[tactic];
+                    
+                    if (i < techniques.length) {
+                        const technique = techniques[i];
+                        td.className = 'technique inactive' + (technique.highValue ? ' high-value' : '');
+                        td.id = technique.id;
+                        td.innerHTML = `
+                            <span class="technique-id">${technique.id}</span>
+                            <span>${technique.name}</span>
+                            <span class="technique-count" style="display: none;">0</span>
+                        `;
+                        td.onclick = () => showTechniqueDetails(technique);
+                        
+                        techniqueStates[technique.id] = { 
+                            state: 'inactive', 
+                            count: 0,
+                            name: technique.name 
+                        };
+                    }
+                    
+                    row.appendChild(td);
+                }
+                
+                matrix.appendChild(row);
+            }
+        }
+        
+        // Update technique state
+        function updateTechnique(techniqueId, newState) {
+            const element = document.getElementById(techniqueId);
+            if (!element) return;
+            
+            const technique = techniqueStates[techniqueId];
+            if (!technique) return;
+            
+            // Remove old state classes
+            element.classList.remove('inactive', 'attempted', 'executing', 'success', 'detected');
+            
+            // Add new state class
+            element.classList.add(newState);
+            technique.state = newState;
+            
+            // Update count
+            if (newState !== 'inactive') {
+                technique.count++;
+                const countElement = element.querySelector('.technique-count');
+                countElement.textContent = technique.count;
+                countElement.style.display = 'block';
+            }
+            
+            // Add to timeline
+            addToTimeline(techniqueId, technique.name, newState);
+            
+            // Update stats
+            updateStats();
+        }
+        
+        // Add event to timeline
+        function addToTimeline(techniqueId, techniqueName, state) {
+            const time = new Date().toLocaleTimeString();
+            const item = {
+                time: time,
+                techniqueId: techniqueId,
+                techniqueName: techniqueName,
+                state: state
+            };
+            
+            timeline.unshift(item);
+            
+            const timelineContent = document.getElementById('timelineContent');
+            const div = document.createElement('div');
+            div.className = 'timeline-item';
+            
+            let stateText = '';
+            let stateColor = '';
+            switch(state) {
+                case 'attempted': 
+                    stateText = 'ATTEMPTED'; 
+                    stateColor = '#ff0'; 
+                    break;
+                case 'executing': 
+                    stateText = 'EXECUTING'; 
+                    stateColor = '#ffa500'; 
+                    break;
+                case 'success': 
+                    stateText = 'EXECUTED'; 
+                    stateColor = '#f00'; 
+                    break;
+                case 'detected': 
+                    stateText = 'DETECTED'; 
+                    stateColor = '#0f0'; 
+                    break;
+            }
+            
+            div.innerHTML = `
+                <div class="time">${time}</div>
+                <div><strong>${techniqueId}</strong> - ${techniqueName}</div>
+                <div style="color: ${stateColor};">${stateText}</div>
+            `;
+            
+            timelineContent.insertBefore(div, timelineContent.firstChild);
+            
+            // Keep only last 20 items
+            while (timelineContent.children.length > 20) {
+                timelineContent.removeChild(timelineContent.lastChild);
+            }
+        }
+        
+        // Update statistics
+        function updateStats() {
+            let attempted = 0;
+            let executed = 0;
+            let detected = 0;
+            
+            for (const id in techniqueStates) {
+                const state = techniqueStates[id].state;
+                if (state !== 'inactive') attempted++;
+                if (state === 'success') executed++;
+                if (state === 'detected') detected++;
+            }
+            
+            document.getElementById('attemptedCount').textContent = attempted;
+            document.getElementById('executedCount').textContent = executed;
+            document.getElementById('detectedCount').textContent = detected;
+        }
+        
+        // Show technique details
+        function showTechniqueDetails(technique) {
+            console.log('Technique clicked:', technique);
+            // In real implementation, show detailed info about the technique
+        }
+        
+        // Simulate technique execution
+        function simulateTechnique(techniqueId) {
+            // Attempted
+            updateTechnique(techniqueId, 'attempted');
+            
+            // Executing after 1 second
+            setTimeout(() => {
+                updateTechnique(techniqueId, 'executing');
+                
+                // Success after 2-5 seconds
+                setTimeout(() => {
+                    updateTechnique(techniqueId, 'success');
+                    
+                    // Detection after 1-3 seconds (70% chance)
+                    if (Math.random() > 0.3) {
+                        setTimeout(() => {
+                            updateTechnique(techniqueId, 'detected');
+                        }, Math.random() * 2000 + 1000);
+                    }
+                }, Math.random() * 3000 + 2000);
+            }, 1000);
+        }
+        
+        // Matrix rain effect
+        function initMatrixRain() {
+            const canvas = document.getElementById('matrixRain');
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            
+            const matrix = "ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789@#$%^&*()*&^%";
+            const matrixArray = matrix.split("");
+            
+            const fontSize = 10;
+            const columns = canvas.width / fontSize;
+            
+            const drops = [];
+            for(let x = 0; x < columns; x++) {
+                drops[x] = Math.floor(Math.random() * canvas.height / fontSize);
+            }
+            
+            function draw() {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.04)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                ctx.fillStyle = '#0f0';
+                ctx.font = fontSize + 'px monospace';
+                
+                for(let i = 0; i < drops.length; i++) {
+                    const text = matrixArray[Math.floor(Math.random() * matrixArray.length)];
+                    ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+                    
+                    if(drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+                        drops[i] = 0;
+                    }
+                    drops[i]++;
+                }
+            }
+            
+            setInterval(draw, 35);
+        }
+        
+        // Simulate attack scenario
+        function runAttackSimulation() {
+            const sequence = [
+                // Initial Access
+                { id: 'T1566.001', delay: 1000 },
+                { id: 'T1078', delay: 2000 },
+                
+                // Execution
+                { id: 'T1059.001', delay: 1000 },
+                { id: 'T1059.003', delay: 500 },
+                
+                // Persistence
+                { id: 'T1547.001', delay: 2000 },
+                { id: 'T1543.003', delay: 1000 },
+                
+                // Privilege Escalation
+                { id: 'T1055', delay: 3000 },
+                { id: 'T1574.001', delay: 1000 },
+                
+                // Defense Evasion
+                { id: 'T1070', delay: 1000 },
+                { id: 'T1036', delay: 1000 },
+                { id: 'T1562.001', delay: 2000 },
+                
+                // Credential Access
+                { id: 'T1003', delay: 3000 },
+                { id: 'T1555', delay: 1000 },
+                { id: 'T1110', delay: 2000 },
+                
+                // Discovery
+                { id: 'T1082', delay: 500 },
+                { id: 'T1083', delay: 1000 },
+                { id: 'T1057', delay: 500 },
+                
+                // Collection
+                { id: 'T1113', delay: 1000 },
+                { id: 'T1115', delay: 500 },
+                { id: 'T1560', delay: 2000 },
+                
+                // Exfiltration
+                { id: 'T1567', delay: 3000 },
+                { id: 'T1041', delay: 1000 },
+                
+                // Impact
+                { id: 'T1486', delay: 5000 },
+                { id: 'T1490', delay: 2000 }
+            ];
+            
+            let totalDelay = 0;
+            sequence.forEach(item => {
+                setTimeout(() => {
+                    simulateTechnique(item.id);
+                }, totalDelay);
+                totalDelay += item.delay;
+            });
+        }
+        
+        // Initialize
+        buildMatrix();
+        initMatrixRain();
+        
+        // Start simulation after 3 seconds
+        setTimeout(runAttackSimulation, 3000);
+        
+        // Resize handler
+        window.addEventListener('resize', () => {
+            const canvas = document.getElementById('matrixRain');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+    </script>
+</body>
+</html>

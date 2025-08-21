@@ -1,0 +1,3 @@
+# Python requirements for C2 Web Dashboard
+websockets>=10.0
+asyncio

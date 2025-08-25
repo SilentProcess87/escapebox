@@ -49,7 +49,7 @@ Once the server is running and clients are connected, use these keyboard control
 | R | Ransomware | Trigger ransomware simulation on all bots |
 | E | Exfiltration | Execute data exfiltration on all bots |
 | P | Persistence | Install persistence mechanisms on all bots |
-| C | Clear Logs | Clear Windows event logs on all bots |
+| C | Clear All Logs | Clear Windows event logs on all bots |
 | S | Screenshot | Take screenshots from all bots |
 | K | Keylogger | Start keylogger on all bots |
 | D | Dump Keylogs | Dump captured keylogger data from all bots |

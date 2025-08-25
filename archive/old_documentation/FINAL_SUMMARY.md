@@ -46,7 +46,7 @@ The EscapeBox C2 system has been fully upgraded from simulations to real malicio
 - **R** - Ransomware simulation
 - **E** - Data exfiltration
 - **P** - Persistence installation
-- **C** - Clear logs
+- **C** - Clear All Logs
 - **ESC** - Shutdown server
 
 ## Real Implementations Status

